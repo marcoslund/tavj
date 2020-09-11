@@ -16,7 +16,7 @@ public class SimulationTest : MonoBehaviour
 
     [SerializeField] private Rigidbody cubeRigidBody;
 
-    [SerializeField] private Dictionary<int, CubeClient> cubeClients = new Dictionary<int, CubeClient>();
+    [SerializeField] private Dictionary<int, ClientEntity> cubeClients = new Dictionary<int, ClientEntity>();
 
     public const int PortsPerClient = 2;
     public int sendBasePort = 9000;
@@ -40,15 +40,6 @@ public class SimulationTest : MonoBehaviour
 
     // Update is called once per frame
     void Update() {
-        if (Input.GetKeyDown(KeyCode.C))
-        {
-            int userID = new Random().Next();
-            GameObject userCube = Instantiate(clientPrefab);
-            CubeClient cubeClientComponent = userCube.GetComponent<CubeClient>();
-            cubeClientComponent.Initialize(recvBasePort + clientCount * PortsPerClient,
-                sendBasePort + clientCount * PortsPerClient, userID, interpolationCount);
-            clientCount++;
-        }
         if (Input.GetKeyDown(KeyCode.D))
         {
             serverConnected = !serverConnected;
@@ -69,13 +60,13 @@ public class SimulationTest : MonoBehaviour
         foreach (var cubeClientPair in cubeClients)
         {
             int userID = cubeClientPair.Key;
-            CubeClient cubeClient = cubeClientPair.Value;
+            ClientEntity cubeClient = cubeClientPair.Value;
             var commandPacket = cubeClient.sendChannel.GetPacket();
             
             if (commandPacket != null) {
                 var buffer = commandPacket.buffer;
 
-                List<Commands> commandsList = CubeEntity.ServerDeserializeInput(buffer);
+                List<Commands> commandsList = SerializationManager.ServerDeserializeInput(buffer);
                 var packet = Packet.Obtain();
                 int receivedCommandSequence = -1;
                 foreach (Commands commands in commandsList)
@@ -83,7 +74,7 @@ public class SimulationTest : MonoBehaviour
                     receivedCommandSequence = commands.Seq;
                     ExecuteClientInput(commands);
                 }
-                CubeEntity.ServerSerializeAck(packet.buffer, receivedCommandSequence);
+                SerializationManager.ServerSerializeAck(packet.buffer, receivedCommandSequence);
                 packet.buffer.Flush();
 
                 string serverIP = "127.0.0.1";
@@ -95,9 +86,9 @@ public class SimulationTest : MonoBehaviour
             
             if (accum >= sendRate)
             {
-                //serialize
+                // Serialize & send snapshot to clients
                 var packet = Packet.Obtain();
-                CubeEntity.ServerWorldSerialize(cubeRigidBody, packet.buffer, seq, serverTime);
+                SerializationManager.ServerWorldSerialize(cubeRigidBody, packet.buffer, seq, serverTime);
                 packet.buffer.Flush();
 
                 string serverIP = "127.0.0.1";
