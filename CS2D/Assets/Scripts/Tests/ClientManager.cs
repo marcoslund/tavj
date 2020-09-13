@@ -1,15 +1,16 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Net;
+using UnityEditor.UIElements;
 using UnityEngine;
 
 public class ClientManager : MonoBehaviour
 {
     // Channels to and from server
-    public int sendBasePort = 9000;
-    public int recvBasePort = 9001;
-    public Channel sendChannel;
-    public Channel recvChannel;
+    private int sendPort = 9000;
+    private int recvPort = 9001;
+    private Channel sendChannel;
+    private Channel recvChannel;
 
     private int clientCounter = 0;
     private Dictionary<int, float> clientConnectionsTimeouts;
@@ -21,8 +22,8 @@ public class ClientManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        sendChannel = new Channel(sendBasePort);
-        recvChannel = new Channel(recvBasePort);
+        sendChannel = new Channel(sendPort);
+        recvChannel = new Channel(recvPort);
         
         clientConnectionsTimeouts = new Dictionary<int, float>();
     }
@@ -36,8 +37,10 @@ public class ClientManager : MonoBehaviour
             // Make packet, send to server with timeout,
             // wait for response with userID and channel ports, and then instantiate cube (with associated color),
             // which will recieve snapshots separately
-            SendClientConnection(clientCounter);
-            clientConnectionsTimeouts.Add(clientCounter, ClientConnectionTimeout);
+            
+            int userId = Random.Range(0, int.MaxValue); // Collisions are unlikely for the time being
+            SendClientConnection(userId);
+            clientConnectionsTimeouts.Add(userId, ClientConnectionTimeout);
             clientCounter++;
         }
         
@@ -61,22 +64,22 @@ public class ClientManager : MonoBehaviour
         }
     }
 
-    private void SendClientConnection(int userTrackId)
+    private void SendClientConnection(int userId)
     {
         var packet = Packet.Obtain();
-        SerializeClientConnection(packet.buffer, userTrackId);
+        SerializeClientConnection(packet.buffer, userId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendBasePort);
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
         sendChannel.Send(packet, remoteEp);
 
         packet.Free();
     }
     
-    public void SerializeClientConnection(BitBuffer buffer, int userTrackId) {
+    public void SerializeClientConnection(BitBuffer buffer, int userId) {
         buffer.PutByte((int) PacketType.Join);
-        buffer.PutByte(userTrackId);
+        buffer.PutByte(userId);
     }
     
     private void Deserialize(BitBuffer buffer)
@@ -85,15 +88,14 @@ public class ClientManager : MonoBehaviour
 
         if (messageType == PacketType.PlayerJoinedResponse)
         {
-            int userTrackId = buffer.GetByte();
-            if (clientConnectionsTimeouts.ContainsKey(userTrackId))
+            int userId = buffer.GetInt();
+            if (clientConnectionsTimeouts.ContainsKey(userId))
             {
-                clientConnectionsTimeouts.Remove(userTrackId);
+                clientConnectionsTimeouts.Remove(userId);
                 
                 GameObject newClient = Instantiate(clientPrefab);
                 ClientEntity clientEntityComponent = newClient.GetComponent<ClientEntity>();
                 
-                int userId = buffer.GetByte();
                 int sendPort = buffer.GetByte();
                 int recvPort = buffer.GetByte();
                 int minBufferElems = buffer.GetByte();

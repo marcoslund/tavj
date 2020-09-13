@@ -5,20 +5,28 @@ using UnityEngine;
 
 public class SerializationManager
 {
-    public static void ServerWorldSerialize(Rigidbody rigidBody, BitBuffer buffer, int seq, float time) {
-        var transform = rigidBody.transform;
-        var position = transform.position;
-        var rotation = transform.rotation;
+    public static void ServerWorldSerialize(BitBuffer buffer, Dictionary<int, Rigidbody> clientRigidbodies, int snapshotSeq, float serverTime) {
         buffer.PutByte((int) PacketType.Snapshot);
-        buffer.PutInt(seq);
-        buffer.PutFloat(time);
-        buffer.PutFloat(position.x);
-        buffer.PutFloat(position.y);
-        buffer.PutFloat(position.z);
-        buffer.PutFloat(rotation.w);
-        buffer.PutFloat(rotation.x);
-        buffer.PutFloat(rotation.y);
-        buffer.PutFloat(rotation.z);
+        buffer.PutInt(snapshotSeq);
+        buffer.PutFloat(serverTime);
+        buffer.PutByte(clientRigidbodies.Count);
+
+        foreach (var clientRigidbodyPair in clientRigidbodies)
+        {
+            var clientId = clientRigidbodyPair.Key;
+            var transform = clientRigidbodyPair.Value.transform;
+            var position = transform.position;
+            var rotation = transform.rotation;
+            
+            buffer.PutInt(clientId);
+            buffer.PutFloat(position.x);
+            buffer.PutFloat(position.y);
+            buffer.PutFloat(position.z);
+            buffer.PutFloat(rotation.w);
+            buffer.PutFloat(rotation.x);
+            buffer.PutFloat(rotation.y);
+            buffer.PutFloat(rotation.z);
+        }
     }
 
     public static List<Commands> ServerDeserializeInput(BitBuffer buffer)
