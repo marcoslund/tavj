@@ -1,19 +1,20 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Snapshot : IComparable<Snapshot>
 {
     private int seq;
     private float time;
-    private Vector3 position;
-    private Quaternion rotation;
+    private Dictionary<int, Vector3> positions;
+    private Dictionary<int, Quaternion> rotations;
 
-    public Snapshot(int seq, float time, Vector3 position, Quaternion rotation)
+    public Snapshot(int seq, float time, Dictionary<int, Vector3> positions, Dictionary<int, Quaternion> rotations)
     {
         this.seq = seq;
         this.time = time;
-        this.position = position;
-        this.rotation = rotation;
+        this.positions = positions;
+        this.rotations = rotations;
     }
 
     public int CompareTo(Snapshot other)
@@ -25,12 +26,12 @@ public class Snapshot : IComparable<Snapshot>
 
     public float Time => time;
 
-    public Vector3 Position => position;
+    public Dictionary<int, Vector3> Positions => positions;
 
-    public Quaternion Rotation => rotation;
+    public Dictionary<int, Quaternion> Rotations => rotations;
 
     public override string ToString()
     {
-        return $"Seq: {seq}, Time: {time}, Position: {position}, Rotation: {rotation}";
+        return $"Seq: {seq}, Time: {time}, Positions: {positions}, Rotations: {rotations}";
     }
 }

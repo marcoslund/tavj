@@ -19,14 +19,14 @@ public class ServerEntity : MonoBehaviour
     [SerializeField] private Dictionary<int, Rigidbody> clientCubes = new Dictionary<int, Rigidbody>();
     private Dictionary<int, int> toClientPorts = new Dictionary<int, int>();
     private Dictionary<int, int> fromClientPorts = new Dictionary<int, int>();
-    private Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
-    private Dictionary<int, Channel> fromClientChannels = new Dictionary<int, Channel>();
+    public Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
+    public Dictionary<int, Channel> fromClientChannels = new Dictionary<int, Channel>();
 
     public const int PortsPerClient = 2;
     public int sendPort = 9001;
     public int recvPort = 9000;
-    private Channel sendChannel;
-    private Channel recvChannel;
+    public Channel sendChannel;
+    public Channel recvChannel;
     private int clientBasePort = 9010;
     public int clientCount = 0;
     public int minInterpolationBufferElems = 2;
@@ -37,14 +37,17 @@ public class ServerEntity : MonoBehaviour
     private float serverTime = 0;
     private int nextSnapshotSeq = 0; // Next snapshot to send
     
-    private bool serverConnected;
+    private bool serverConnected = true;
 
     private Color serverCubesColor = Color.white;
     private float floorSide = 4.5f; // Hardcoded
-    private float initY = 0.5f;
+    private float initY = 0.6f;
 
     // Start is called before the first frame update
-    void Start() {
+    void Awake() {
+        sendChannel = new Channel(sendPort);
+        recvChannel = new Channel(recvPort);
+        
         sendRate = 1f / pps;
     }
 
@@ -85,7 +88,7 @@ public class ServerEntity : MonoBehaviour
                     receivedCommandSequence = commands.Seq;
                     ExecuteClientInput(clientCubes[clientId], commands);
                 }
-                SerializationManager.ServerSerializeAck(packet.buffer, receivedCommandSequence);
+                SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
                 packet.buffer.Flush();
 
                 string serverIP = "127.0.0.1";
@@ -152,15 +155,16 @@ public class ServerEntity : MonoBehaviour
     private void ListenForPlayerConnections()
     {
         var playerConnectionPacket = recvChannel.GetPacket();
-
-        if (playerConnectionPacket == null) return;
         
+        if (playerConnectionPacket == null) return;
+        Debug.Log("CONNECTION");
         var buffer = playerConnectionPacket.buffer;
 
         int newUserId = DeserializeJoin(buffer);
-            
+        
         // Create cube game object
         Rigidbody newClient = Instantiate(cubePrefab).GetComponent<Rigidbody>();
+        newClient.GetComponent<Renderer>().material.color = serverCubesColor;
         clientCubes.Add(newUserId, newClient);
 
         int clientSendPort = clientBasePort + clientCount * PortsPerClient;
@@ -200,7 +204,7 @@ public class ServerEntity : MonoBehaviour
         if (messageType != PacketType.Join)
             throw new ArgumentException("Unknown message type received from client manager.");
         
-        int userId = buffer.GetByte();
+        int userId = buffer.GetInt();
         return userId;
     }
 
@@ -234,9 +238,10 @@ public class ServerEntity : MonoBehaviour
     private void SerializePlayerJoinedResponse(BitBuffer buffer, int newUserId, Vector3 newClientPosition,
         Quaternion newClientRotation)
     {
+        buffer.PutByte((int) PacketType.PlayerJoinedResponse);
         buffer.PutInt(newUserId);
-        buffer.PutByte(fromClientPorts[newUserId]);
-        buffer.PutByte(toClientPorts[newUserId]);
+        buffer.PutInt(fromClientPorts[newUserId]);
+        buffer.PutInt(toClientPorts[newUserId]);
         buffer.PutByte(minInterpolationBufferElems);
         buffer.PutFloat(newClientPosition.x);
         buffer.PutFloat(newClientPosition.y);
@@ -255,7 +260,7 @@ public class ServerEntity : MonoBehaviour
                 var position = clientTransform.position;
                 var rotation = clientTransform.rotation;
                 
-                buffer.PutByte(clientId);
+                buffer.PutInt(clientId);
                 buffer.PutFloat(position.x);
                 buffer.PutFloat(position.y);
                 buffer.PutFloat(position.z);

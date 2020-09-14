@@ -9,21 +9,21 @@ public class ClientManager : MonoBehaviour
     // Channels to and from server
     private int sendPort = 9000;
     private int recvPort = 9001;
-    private Channel sendChannel;
-    private Channel recvChannel;
+    //private Channel sendChannel; TODO CANNOT REUSE PORTS
+    //private Channel recvChannel;
+    public ServerEntity serverEntity;
 
     private int clientCounter = 0;
     private Dictionary<int, float> clientConnectionsTimeouts;
     public const float ClientConnectionTimeout = 1f;
     
     public GameObject clientPrefab;
-    public GameObject cubePrefab;
     
     // Start is called before the first frame update
     void Start()
     {
-        sendChannel = new Channel(sendPort);
-        recvChannel = new Channel(recvPort);
+        //sendChannel = new Channel(sendPort);
+        //recvChannel = new Channel(recvPort);
         
         clientConnectionsTimeouts = new Dictionary<int, float>();
     }
@@ -43,11 +43,11 @@ public class ClientManager : MonoBehaviour
             clientConnectionsTimeouts.Add(userId, ClientConnectionTimeout);
             clientCounter++;
         }
-        
-        var packet = recvChannel.GetPacket();
+
+        var packet = serverEntity.sendChannel.GetPacket();//recvChannel.GetPacket();
         if (packet != null) {
             var buffer = packet.buffer;
-
+            Debug.Log("Recieved packet at client manager");
             // Deserialize
             Deserialize(buffer);
         }
@@ -72,20 +72,20 @@ public class ClientManager : MonoBehaviour
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        sendChannel.Send(packet, remoteEp);
-
+        serverEntity.recvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+        Debug.Log("Sent connection request to server");
         packet.Free();
     }
     
     public void SerializeClientConnection(BitBuffer buffer, int userId) {
         buffer.PutByte((int) PacketType.Join);
-        buffer.PutByte(userId);
+        buffer.PutInt(userId);
     }
     
     private void Deserialize(BitBuffer buffer)
     {
         PacketType messageType = (PacketType) buffer.GetByte();
-
+        
         if (messageType == PacketType.PlayerJoinedResponse)
         {
             int userId = buffer.GetInt();
@@ -96,8 +96,8 @@ public class ClientManager : MonoBehaviour
                 GameObject newClient = Instantiate(clientPrefab);
                 ClientEntity clientEntityComponent = newClient.GetComponent<ClientEntity>();
                 
-                int sendPort = buffer.GetByte();
-                int recvPort = buffer.GetByte();
+                int sendPort = buffer.GetInt();
+                int recvPort = buffer.GetInt();
                 int minBufferElems = buffer.GetByte();
                 var position = new Vector3();
                 var rotation = new Quaternion();
@@ -116,12 +116,12 @@ public class ClientManager : MonoBehaviour
                     Random.Range(0f, 1f)
                 );
                 
-                clientEntityComponent.Initialize(sendPort, recvPort, userId, minBufferElems, clientColor);
+                clientEntityComponent.Initialize(sendPort, recvPort, userId, minBufferElems, clientColor, position, rotation, this);
                 
                 int connectedPlayerCount = buffer.GetByte();
                 for (int i = 0; i < connectedPlayerCount; i++)
                 {
-                    userId = buffer.GetByte();
+                    userId = buffer.GetInt();
                     position = new Vector3();
                     rotation = new Quaternion();
                     
@@ -133,7 +133,7 @@ public class ClientManager : MonoBehaviour
                     rotation.y = buffer.GetFloat();
                     rotation.z = buffer.GetFloat();
 
-                    clientEntityComponent.InitializeConnectedPlayer(cubePrefab, userId, position, rotation);
+                    clientEntityComponent.InitializeConnectedPlayer(userId, position, rotation);
                 }
             }
         }

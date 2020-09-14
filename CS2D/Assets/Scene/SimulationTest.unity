@@ -152,8 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e98199a642c66b4fab63732ca2e1d07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sendBasePort: 9000
-  recvBasePort: 9001
+  serverEntity: {fileID: 803758057}
   clientPrefab: {fileID: 3486015604801637705, guid: 313bcb7fd7283492e8e15fc30ec40be2,
     type: 3}
   cubePrefab: {fileID: 1686789242554567366, guid: 4bee5f562f478fb448763eb82ec39903,
@@ -166,7 +165,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 163259558}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.5, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -275,7 +274,7 @@ GameObject:
   - component: {fileID: 803758058}
   - component: {fileID: 803758057}
   m_Layer: 0
-  m_Name: SimulationTest
+  m_Name: Server Controller
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -293,13 +292,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 982debb929dfa4e818c5cba0c83c6031, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  clientPrefab: {fileID: 0}
-  cubeRigidBody: {fileID: 1277577281}
-  sendBasePort: 9000
-  recvBasePort: 9001
+  cubePrefab: {fileID: 1686789242554567366, guid: 4bee5f562f478fb448763eb82ec39903,
+    type: 3}
+  sendPort: 9001
+  recvPort: 9000
   clientCount: 0
+  minInterpolationBufferElems: 2
   pps: 60
-  interpolationCount: 2
 --- !u!4 &803758058
 Transform:
   m_ObjectHideFlags: 0
@@ -512,7 +511,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &1277577277
 BoxCollider:
   m_ObjectHideFlags: 0

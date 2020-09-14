@@ -51,9 +51,9 @@ public class SerializationManager
         return totalCommands;
     }
 
-    public static void ServerSerializeAck(BitBuffer buffer, int commandSequence)
+    public static void ServerSerializeCommandAck(BitBuffer buffer, int commandSequence)
     {
-        buffer.PutByte((int) PacketType.Ack);
+        buffer.PutByte((int) PacketType.CommandAck);
         buffer.PutInt(commandSequence);
     }
 }

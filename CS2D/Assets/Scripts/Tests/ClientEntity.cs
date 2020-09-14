@@ -9,8 +9,8 @@ public class ClientEntity : MonoBehaviour
 {
     public int sendPort;
     public int recvPort;
-    public Channel sendChannel;
-    public Channel recvChannel;
+    //public Channel sendChannel;
+    //public Channel recvChannel;
 
     public int userId;
     public int displaySeq = 0;
@@ -19,39 +19,48 @@ public class ClientEntity : MonoBehaviour
 
     public List<Snapshot> interpolationBuffer = new List<Snapshot>();
     public List<Commands> commands = new List<Commands>();
-    public int minBufferElems;
+    public int minInterpolationBufferElems;
 
-    private Dictionary<int, Rigidbody> players;
+    private Dictionary<int, Transform> otherClientCubes = new Dictionary<int, Transform>();
     private Color clientColor;
+    public GameObject cubePrefab;
 
-    public void Initialize(int sendPort, int recvPort, int userId, int minBufferElems, Color clientColor)
+    private ClientManager clientManager;
+
+    public void Initialize(int sendPort, int recvPort, int userId, int minInterpolationBufferElems, Color clientColor,
+        Vector3 position, Quaternion rotation, ClientManager clientManager)
     {
         this.sendPort = sendPort;
-        sendChannel = new Channel(sendPort);
+        //sendChannel = new Channel(sendPort);
         this.recvPort = recvPort;
-        recvChannel = new Channel(recvPort);
+        //recvChannel = new Channel(recvPort);
         this.userId = userId;
-        this.minBufferElems = minBufferElems;
+        this.minInterpolationBufferElems = minInterpolationBufferElems;
         this.clientColor = clientColor;
         
         Renderer rend = GetComponent<Renderer>();
         rend.material.color = clientColor;
+
+        transform.position = position;
+        transform.rotation = rotation;
+
+        this.clientManager = clientManager;
     }
 
     private void Update()
     {
-        var packet = recvChannel.GetPacket();
+        var packet = clientManager.serverEntity.toClientChannels[userId].GetPacket();//recvChannel.GetPacket();
 
         if (packet != null) {
             var buffer = packet.buffer;
 
             // Deserialize
-            Deserialize(interpolationBuffer, buffer, displaySeq, commands);
+            Deserialize(buffer);
         }
 
         ReadClientInput();
 
-        if (interpolationBuffer.Count >= minBufferElems)
+        if (interpolationBuffer.Count >= minInterpolationBufferElems)
             isPlaying = true;
         else if (interpolationBuffer.Count <= 1)
             isPlaying = false;
@@ -92,12 +101,12 @@ public class ClientEntity : MonoBehaviour
             commands.Add(currentCommands);
             // Serialize & send commands to server
             var packet = Packet.Obtain();
-            SerializeCommands(commands, packet.buffer);
+            SerializeCommands(packet.buffer);
             packet.buffer.Flush();
 
             string serverIP = "127.0.0.1";
             var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-            sendChannel.Send(packet, remoteEp);
+            clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
 
             packet.Free();
         }
@@ -108,17 +117,41 @@ public class ClientEntity : MonoBehaviour
         var position = new Vector3();
         var rotation = new Quaternion();
 
-        position.x = InterpolateAxis(prevSnapshot.Position.x, nextSnapshot.Position.x, t);
-        position.y = InterpolateAxis(prevSnapshot.Position.y, nextSnapshot.Position.y, t);
-        position.z = InterpolateAxis(prevSnapshot.Position.z, nextSnapshot.Position.z, t);
+        position.x = InterpolateAxis(prevSnapshot.Positions[userId].x, nextSnapshot.Positions[userId].x, t);
+        position.y = InterpolateAxis(prevSnapshot.Positions[userId].y, nextSnapshot.Positions[userId].y, t);
+        position.z = InterpolateAxis(prevSnapshot.Positions[userId].z, nextSnapshot.Positions[userId].z, t);
     
-        rotation.w = InterpolateAxis(prevSnapshot.Rotation.w, nextSnapshot.Rotation.w, t);
-        rotation.x = InterpolateAxis(prevSnapshot.Rotation.x, nextSnapshot.Rotation.x, t);
-        rotation.y = InterpolateAxis(prevSnapshot.Rotation.y, nextSnapshot.Rotation.y, t);
-        rotation.z = InterpolateAxis(prevSnapshot.Rotation.z, nextSnapshot.Rotation.z, t);
+        rotation.w = InterpolateAxis(prevSnapshot.Rotations[userId].w, nextSnapshot.Rotations[userId].w, t);
+        rotation.x = InterpolateAxis(prevSnapshot.Rotations[userId].x, nextSnapshot.Rotations[userId].x, t);
+        rotation.y = InterpolateAxis(prevSnapshot.Rotations[userId].y, nextSnapshot.Rotations[userId].y, t);
+        rotation.z = InterpolateAxis(prevSnapshot.Rotations[userId].z, nextSnapshot.Rotations[userId].z, t);
     
         transform.position = position;
         transform.rotation = rotation;
+        
+        foreach (var clientCubePair in otherClientCubes)
+        {
+            var clientId = clientCubePair.Key;
+
+            if (prevSnapshot.Positions.ContainsKey(clientId))
+            {
+                position = new Vector3();
+                rotation = new Quaternion();
+            
+                position.x = InterpolateAxis(prevSnapshot.Positions[clientId].x, nextSnapshot.Positions[clientId].x, t);
+                position.y = InterpolateAxis(prevSnapshot.Positions[clientId].y, nextSnapshot.Positions[clientId].y, t);
+                position.z = InterpolateAxis(prevSnapshot.Positions[clientId].z, nextSnapshot.Positions[clientId].z, t);
+    
+                rotation.w = InterpolateAxis(prevSnapshot.Rotations[clientId].w, nextSnapshot.Rotations[clientId].w, t);
+                rotation.x = InterpolateAxis(prevSnapshot.Rotations[clientId].x, nextSnapshot.Rotations[clientId].x, t);
+                rotation.y = InterpolateAxis(prevSnapshot.Rotations[clientId].y, nextSnapshot.Rotations[clientId].y, t);
+                rotation.z = InterpolateAxis(prevSnapshot.Rotations[clientId].z, nextSnapshot.Rotations[clientId].z, t);
+
+                var clientTransform = clientCubePair.Value;
+                clientTransform.position = position;
+                clientTransform.rotation = rotation;
+            }
+        }
     }
 
     private float InterpolateAxis(float currentSnapValue, float nextSnapValue, float t)
@@ -126,20 +159,20 @@ public class ClientEntity : MonoBehaviour
         return currentSnapValue + (nextSnapValue - currentSnapValue) * t;
     }
     
-    public static void Deserialize(List<Snapshot> interpolationBuffer, BitBuffer buffer, int seqCli, List<Commands> clientCommands)
+    public void Deserialize(BitBuffer buffer)
     {
         PacketType messageType = (PacketType) buffer.GetByte();
 
         switch (messageType)
         {
             case PacketType.Snapshot:
-                DeserializeSnapshot(interpolationBuffer, buffer, seqCli);
+                DeserializeSnapshot(buffer);
                 break;
-            case PacketType.Ack:
+            case PacketType.CommandAck:
             {
                 int receivedAckSequence = DeserializeAck(buffer);
                 int lastAckedCommandsIndex = 0;
-                foreach (var commands in clientCommands)
+                foreach (var commands in commands)
                 {
                     if (commands.Seq > receivedAckSequence)
                     {
@@ -147,44 +180,61 @@ public class ClientEntity : MonoBehaviour
                     }
                     lastAckedCommandsIndex++;
                 }
-                clientCommands.RemoveRange(0, lastAckedCommandsIndex);
+                commands.RemoveRange(0, lastAckedCommandsIndex);
                 break;
             }
+            case PacketType.PlayerJoined:
+                DeserializePlayerJoined(buffer);
+                break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
     }
 
-    private static void DeserializeSnapshot(List<Snapshot> interpolationBuffer, BitBuffer buffer, int seqCli)
+    private void DeserializeSnapshot(BitBuffer buffer)
     {
-        var position = new Vector3();
-        var rotation = new Quaternion();
-        
         var seq = buffer.GetInt();
+        
+        if (seq < displaySeq) return;
+        
         var time = buffer.GetFloat();
-        position.x = buffer.GetFloat();
-        position.y = buffer.GetFloat();
-        position.z = buffer.GetFloat();
-        rotation.w = buffer.GetFloat();
-        rotation.x = buffer.GetFloat();
-        rotation.y = buffer.GetFloat();
-        rotation.z = buffer.GetFloat();
-        
-        if (seq < seqCli) return;
-        
-        Snapshot snapshot = new Snapshot(seq, time, position, rotation);
-        int i;
-        for (i = 0; i < interpolationBuffer.Count; i++)
+        var clientCount = buffer.GetByte();
+
+        Dictionary<int, Vector3> positions = new Dictionary<int, Vector3>();
+        Dictionary<int, Quaternion> rotations = new Dictionary<int, Quaternion>();
+
+        for (int i = 0; i < clientCount; i++)
         {
-            if(interpolationBuffer[i].Seq > seq)
+            var clientId = buffer.GetInt();
+            
+            var position = new Vector3();
+            var rotation = new Quaternion();
+            
+            position.x = buffer.GetFloat();
+            position.y = buffer.GetFloat();
+            position.z = buffer.GetFloat();
+            rotation.w = buffer.GetFloat();
+            rotation.x = buffer.GetFloat();
+            rotation.y = buffer.GetFloat();
+            rotation.z = buffer.GetFloat();
+            
+            positions.Add(clientId, position);
+            rotations.Add(clientId, rotation);
+        }
+
+        Snapshot snapshot = new Snapshot(seq, time, positions, rotations);
+        int bufferIndex;
+        for (bufferIndex = 0; bufferIndex < interpolationBuffer.Count; bufferIndex++)
+        {
+            if(interpolationBuffer[bufferIndex].Seq > seq)
                 break;
         }
-        interpolationBuffer.Insert(i, snapshot);
+        interpolationBuffer.Insert(bufferIndex, snapshot);
     }
 
-    public static void SerializeCommands(List<Commands> clientCommands, BitBuffer buffer)
+    public void SerializeCommands(BitBuffer buffer)
     {
-        foreach (Commands commands in clientCommands)
+        foreach (Commands commands in commands)
         {
             buffer.PutInt(commands.Seq);
             buffer.PutInt(commands.Up ? 1 : 0);
@@ -195,23 +245,41 @@ public class ClientEntity : MonoBehaviour
         }
     }
     
-    private static int DeserializeAck(BitBuffer buffer)
+    private int DeserializeAck(BitBuffer buffer)
     {
         return buffer.GetInt();
     }
     
+    private void DeserializePlayerJoined(BitBuffer buffer)
+    {
+        var clientId = buffer.GetInt();
+            
+        var position = new Vector3();
+        var rotation = new Quaternion();
+            
+        position.x = buffer.GetFloat();
+        position.y = buffer.GetFloat();
+        position.z = buffer.GetFloat();
+        rotation.w = buffer.GetFloat();
+        rotation.x = buffer.GetFloat();
+        rotation.y = buffer.GetFloat();
+        rotation.z = buffer.GetFloat();
+        
+        InitializeConnectedPlayer(clientId, position, rotation);
+    }
+    
     private void OnDestroy() {
-        sendChannel.Disconnect();
-        recvChannel.Disconnect();
+        //sendChannel.Disconnect();
+        //recvChannel.Disconnect();
     }
 
-    public void InitializeConnectedPlayer(GameObject cubePrefab, int connectedPlayerId, Vector3 position, Quaternion rotation)
+    public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
     {
         GameObject newClient = Instantiate(cubePrefab, position, rotation);
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
         newClient.GetComponent<Renderer>().material.color = clientColor;
         
-        players.Add(connectedPlayerId, newClient.GetComponent<Rigidbody>());
+        otherClientCubes.Add(connectedPlayerId, newClient.transform);
     }
 }
