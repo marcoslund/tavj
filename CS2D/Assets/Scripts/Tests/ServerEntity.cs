@@ -163,7 +163,7 @@ public class ServerEntity : MonoBehaviour
         int newUserId = DeserializeJoin(buffer);
         
         // Create cube game object
-        Rigidbody newClient = Instantiate(cubePrefab).GetComponent<Rigidbody>();
+        Rigidbody newClient = Instantiate(cubePrefab, transform).GetComponent<Rigidbody>();
         newClient.GetComponent<Renderer>().material.color = serverCubesColor;
         clientCubes.Add(newUserId, newClient);
 
@@ -180,6 +180,7 @@ public class ServerEntity : MonoBehaviour
         Quaternion clientRotation = newClient.transform.rotation;
 
         newClient.transform.position = clientPosition;
+        newClient.name = $"ServerCube-{newUserId}";
             
         clientCount++;
 
@@ -242,6 +243,7 @@ public class ServerEntity : MonoBehaviour
         buffer.PutInt(newUserId);
         buffer.PutInt(fromClientPorts[newUserId]);
         buffer.PutInt(toClientPorts[newUserId]);
+        buffer.PutFloat(serverTime);
         buffer.PutByte(minInterpolationBufferElems);
         buffer.PutFloat(newClientPosition.x);
         buffer.PutFloat(newClientPosition.y);

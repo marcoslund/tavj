@@ -93,11 +93,13 @@ public class ClientManager : MonoBehaviour
             {
                 clientConnectionsTimeouts.Remove(userId);
                 
-                GameObject newClient = Instantiate(clientPrefab);
-                ClientEntity clientEntityComponent = newClient.GetComponent<ClientEntity>();
+                GameObject newClient = Instantiate(clientPrefab, transform);
+                newClient.name = $"ClientCube-{userId}";
+                ClientEntity clientEntityComponent = newClient.AddComponent<ClientEntity>();
                 
                 int sendPort = buffer.GetInt();
                 int recvPort = buffer.GetInt();
+                float time = buffer.GetFloat();
                 int minBufferElems = buffer.GetByte();
                 var position = new Vector3();
                 var rotation = new Quaternion();
@@ -116,7 +118,7 @@ public class ClientManager : MonoBehaviour
                     Random.Range(0f, 1f)
                 );
                 
-                clientEntityComponent.Initialize(sendPort, recvPort, userId, minBufferElems, clientColor, position, rotation, this);
+                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, minBufferElems, clientColor, position, rotation, this);
                 
                 int connectedPlayerCount = buffer.GetByte();
                 for (int i = 0; i < connectedPlayerCount; i++)
