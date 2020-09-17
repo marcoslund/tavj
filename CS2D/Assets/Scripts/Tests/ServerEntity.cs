@@ -21,6 +21,9 @@ public class ServerEntity : MonoBehaviour
     private Dictionary<int, int> fromClientPorts = new Dictionary<int, int>();
     public Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
     public Dictionary<int, Channel> fromClientChannels = new Dictionary<int, Channel>();
+    
+    private Dictionary<int, Dictionary<int, float>> playerJoinedTimeouts = new Dictionary<int, Dictionary<int, float>>();
+    private const float PlayerJoinedTimeout = 1f;
 
     public const int PortsPerClient = 2;
     public int sendPort = 9001;
@@ -71,31 +74,34 @@ public class ServerEntity : MonoBehaviour
         serverTime += Time.deltaTime;
 
         ListenForPlayerConnections();
+        
+        foreach (var connectedClientPairs in playerJoinedTimeouts)
+        {
+            foreach (var timeoutPair in connectedClientPairs.Value)
+            {
+                var remainingTime = timeoutPair.Value - Time.deltaTime;
+                // Check if timeout has been reached
+                if (remainingTime <= 0)
+                {
+                    var timeoutClientId = timeoutPair.Key;
+                    var connectedPlayerId = connectedClientPairs.Key;
+                    var connectedPlayerTransform = clientCubes[connectedPlayerId].transform;
+                    SendPlayerJoined(toClientPorts[timeoutClientId], toClientChannels[timeoutClientId],
+                        connectedPlayerId, connectedPlayerTransform.position, connectedPlayerTransform.rotation);
+                    playerJoinedTimeouts[connectedPlayerId][timeoutClientId] = PlayerJoinedTimeout;
+                }
+            }
+        }
 
         foreach (var clientId in clientCubes.Keys)
         {
-            // Deserialize input commands for each client
-            var commandPacket = fromClientChannels[clientId].GetPacket();
+            // Deserialize packets for each client
+            var packet = fromClientChannels[clientId].GetPacket();
             
-            if (commandPacket != null) {
-                var buffer = commandPacket.buffer;
+            if (packet != null) {
+                var buffer = packet.buffer;
 
-                List<Commands> commandsList = SerializationManager.ServerDeserializeInput(buffer);
-                var packet = Packet.Obtain();
-                int receivedCommandSequence = -1;
-                foreach (Commands commands in commandsList)
-                {
-                    receivedCommandSequence = commands.Seq;
-                    ExecuteClientInput(clientCubes[clientId], commands);
-                }
-                SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
-                packet.buffer.Flush();
-
-                string serverIP = "127.0.0.1";
-                var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[clientId]);
-                toClientChannels[clientId].Send(packet, remoteEp);
-
-                packet.Free();
+                DeserializeClientMessage(buffer, clientId);
             }
         }
         
@@ -184,8 +190,9 @@ public class ServerEntity : MonoBehaviour
             
         clientCount++;
 
-        ////// Send PlayerJoinedResponse to client manager with timeout
-        SendPlayerJoinedResponse(newUserId, clientPosition, clientRotation); // TODO ADD TIMEOUT
+        SendPlayerJoinedResponse(newUserId, clientPosition, clientRotation);
+        
+        playerJoinedTimeouts.Add(newUserId, new Dictionary<int, float>());
             
         // Send PlayerJoined to existing clients with timeout
         foreach (var clientChannelPair in toClientChannels)
@@ -193,7 +200,8 @@ public class ServerEntity : MonoBehaviour
             var clientId = clientChannelPair.Key;
             if (clientId != newUserId)
             {
-                SendPlayerJoined(toClientPorts[clientId], toClientChannels[clientId], newUserId, clientPosition, clientRotation); // TODO ADD TIMEOUT
+                SendPlayerJoined(toClientPorts[clientId], toClientChannels[clientId], newUserId, clientPosition, clientRotation);
+                playerJoinedTimeouts[newUserId].Add(clientId, PlayerJoinedTimeout);
             }
         }
     }
@@ -286,5 +294,76 @@ public class ServerEntity : MonoBehaviour
         buffer.PutFloat(newClientRotation.x);
         buffer.PutFloat(newClientRotation.y);
         buffer.PutFloat(newClientRotation.z);
+    }
+
+    private void DeserializeClientMessage(BitBuffer buffer, int clientId)
+    {
+        PacketType messageType = (PacketType) buffer.GetInt();
+        
+        switch (messageType)
+        {
+            case PacketType.Commands:
+                List<Commands> commandsList = DeserializeCommands(buffer);
+                ProcessReceivedInput(commandsList, clientId);
+                break;
+            case PacketType.PlayerJoinedAck:
+                DeserializePlayerJoinedAck(buffer);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
+    private List<Commands> DeserializeCommands(BitBuffer buffer)
+    {
+        List<Commands> commandsList = new List<Commands>();
+        
+        while (buffer.HasRemaining())
+        {
+            int seq = buffer.GetInt();
+            
+            Commands commands = new Commands(
+                seq,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0);
+            
+            commandsList.Add(commands);
+        }
+
+        return commandsList;
+    }
+    
+    private void ProcessReceivedInput(List<Commands> commandsList, int clientId)
+    {
+        int receivedCommandSequence = -1;
+        foreach (Commands commands in commandsList)
+        {
+            receivedCommandSequence = commands.Seq;
+            ExecuteClientInput(clientCubes[clientId], commands);
+        }
+        
+        var packet = Packet.Obtain();
+        SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
+        packet.buffer.Flush();
+
+        string serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[clientId]);
+        toClientChannels[clientId].Send(packet, remoteEp);
+
+        packet.Free();
+    }
+    
+    private void DeserializePlayerJoinedAck(BitBuffer buffer)
+    {
+        var clientId = buffer.GetInt();
+        var connectedPlayerId = buffer.GetInt();
+        playerJoinedTimeouts[connectedPlayerId].Remove(clientId);
+        if (playerJoinedTimeouts[connectedPlayerId].Count == 0)
+        {
+            playerJoinedTimeouts.Remove(connectedPlayerId);
+        }
     }
 }

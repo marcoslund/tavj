@@ -29,31 +29,9 @@ public class SerializationManager
         }
     }
 
-    public static List<Commands> ServerDeserializeInput(BitBuffer buffer)
-    {
-        List<Commands> totalCommands = new List<Commands>();
-        
-        while (buffer.HasRemaining())
-        {
-            int seq = buffer.GetInt();
-
-            Commands commands = new Commands(
-                seq,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0);
-
-            totalCommands.Add(commands);
-        }
-
-        return totalCommands;
-    }
-
     public static void ServerSerializeCommandAck(BitBuffer buffer, int commandSequence)
     {
-        buffer.PutByte((int) PacketType.CommandAck);
+        buffer.PutByte((int) PacketType.CommandsAck);
         buffer.PutInt(commandSequence);
     }
 }

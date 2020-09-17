@@ -168,7 +168,7 @@ public class ClientEntity : MonoBehaviour
             case PacketType.Snapshot:
                 DeserializeSnapshot(buffer);
                 break;
-            case PacketType.CommandAck:
+            case PacketType.CommandsAck:
             {
                 int receivedAckSequence = DeserializeAck(buffer);
                 int lastAckedCommandsIndex = 0;
@@ -234,6 +234,7 @@ public class ClientEntity : MonoBehaviour
 
     public void SerializeCommands(BitBuffer buffer)
     {
+        buffer.PutInt((int) PacketType.Commands);
         foreach (Commands commands in commands)
         {
             buffer.PutInt(commands.Seq);
@@ -266,8 +267,10 @@ public class ClientEntity : MonoBehaviour
         rotation.z = buffer.GetFloat();
         
         InitializeConnectedPlayer(clientId, position, rotation);
+        
+        SendPlayerJoinedAck(clientId);
     }
-    
+
     private void OnDestroy() {
         //sendChannel.Disconnect();
         //recvChannel.Disconnect();
@@ -282,5 +285,25 @@ public class ClientEntity : MonoBehaviour
         newClient.GetComponent<Renderer>().material.color = clientColor;
         
         otherClientCubes.Add(connectedPlayerId, newClient.transform);
+    }
+    
+    private void SendPlayerJoinedAck(int clientId)
+    {
+        var packet = Packet.Obtain();
+        SerializePlayerJoinedAck(packet.buffer, clientId);
+        packet.buffer.Flush();
+
+        string serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
+        clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+
+        packet.Free();
+    }
+
+    private void SerializePlayerJoinedAck(BitBuffer buffer, int clientId)
+    {
+        buffer.PutInt((int) PacketType.PlayerJoinedAck);
+        buffer.PutInt(userId);
+        buffer.PutInt(clientId);
     }
 }

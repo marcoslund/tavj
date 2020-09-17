@@ -1,4 +1,4 @@
 ﻿public enum PacketType  
 {  
-    Snapshot = 0, CommandAck = 1, Join = 2, PlayerJoined = 3, PlayerJoinedResponse = 4
+    Snapshot = 0, Commands = 1, CommandsAck = 2, Join = 3, PlayerJoinedResponse = 4, PlayerJoined = 5, PlayerJoinedAck = 6
 };
