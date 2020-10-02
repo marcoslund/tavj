@@ -5,16 +5,16 @@ using UnityEngine;
 
 public class SerializationManager
 {
-    public static void ServerWorldSerialize(BitBuffer buffer, Dictionary<int, Rigidbody> clientRigidbodies, int snapshotSeq, float serverTime) {
+    public static void ServerWorldSerialize(BitBuffer buffer, Dictionary<int, CharacterController> clients, int snapshotSeq, float serverTime) {
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
-        buffer.PutByte(clientRigidbodies.Count);
+        buffer.PutByte(clients.Count);
 
-        foreach (var clientRigidbodyPair in clientRigidbodies)
+        foreach (var client in clients)
         {
-            var clientId = clientRigidbodyPair.Key;
-            var transform = clientRigidbodyPair.Value.transform;
+            var clientId = client.Key;
+            var transform = client.Value.transform;
             var position = transform.position;
             var rotation = transform.rotation;
             

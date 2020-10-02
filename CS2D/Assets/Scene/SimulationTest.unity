@@ -153,10 +153,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   serverEntity: {fileID: 803758057}
-  clientPrefab: {fileID: 3486015604801637705, guid: 313bcb7fd7283492e8e15fc30ec40be2,
-    type: 3}
   cubePrefab: {fileID: 1686789242554567366, guid: 4bee5f562f478fb448763eb82ec39903,
     type: 3}
+  maxClientCount: 10
 --- !u!4 &163259560
 Transform:
   m_ObjectHideFlags: 0

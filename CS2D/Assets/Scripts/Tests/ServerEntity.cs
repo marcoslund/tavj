@@ -16,7 +16,7 @@ public class ServerEntity : MonoBehaviour
 
     //[SerializeField] private Rigidbody cubeRigidBody;
 
-    [SerializeField] private Dictionary<int, Rigidbody> clientCubes = new Dictionary<int, Rigidbody>();
+    [SerializeField] private Dictionary<int, CharacterController> clientCubes = new Dictionary<int, CharacterController>();
     private Dictionary<int, int> toClientPorts = new Dictionary<int, int>();
     private Dictionary<int, int> fromClientPorts = new Dictionary<int, int>();
     public Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
@@ -45,7 +45,7 @@ public class ServerEntity : MonoBehaviour
     private Color serverCubesColor = Color.white;
     private float floorSide = 4.5f; // Hardcoded
     private float initY = 0.6f;
-
+    
     // Start is called before the first frame update
     void Awake() {
         sendChannel = new Channel(sendPort);
@@ -72,6 +72,8 @@ public class ServerEntity : MonoBehaviour
     private void UpdateServer()
     {
         serverTime += Time.deltaTime;
+
+        ApplyGravityToClients();
 
         ListenForPlayerConnections();
         
@@ -122,6 +124,16 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
+    private void ApplyGravityToClients()
+    {
+        foreach (var client in clientCubes.Values)
+        {
+            if (!client.isGrounded){
+               client.SimpleMove(Vector3.zero);
+            }
+        }
+    }
+
     private void SendSnapshotToClient(int clientId/*, BitBuffer snapshotBuffer*/)
     {
         var packet = Packet.Obtain();
@@ -138,23 +150,23 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void ExecuteClientInput(Rigidbody clientRigidbody, Commands commands)
+    private void ExecuteClientInput(CharacterController client, Commands commands)
     {
         //apply input
         if (commands.Space) {
-            clientRigidbody.AddForceAtPosition(Vector3.up * 5, Vector3.zero, ForceMode.Impulse);
+            //clientRigidbody.AddForceAtPosition(Vector3.up * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Left) {
-            clientRigidbody.AddForceAtPosition(Vector3.left * 5, Vector3.zero, ForceMode.Impulse);
+            //clientRigidbody.AddForceAtPosition(Vector3.left * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Right) {
-            clientRigidbody.AddForceAtPosition(Vector3.right * 5, Vector3.zero, ForceMode.Impulse);
+            //clientRigidbody.AddForceAtPosition(Vector3.right * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Up) {
-            clientRigidbody.AddForceAtPosition(Vector3.forward * 5, Vector3.zero, ForceMode.Impulse);
+            //clientRigidbody.AddForceAtPosition(Vector3.forward * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Down) {
-            clientRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
+            //clientRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
         }
     }
 
@@ -169,7 +181,7 @@ public class ServerEntity : MonoBehaviour
         int newUserId = DeserializeJoin(buffer);
         
         // Create cube game object
-        Rigidbody newClient = Instantiate(cubePrefab, transform).GetComponent<Rigidbody>();
+        CharacterController newClient = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
         newClient.GetComponent<Renderer>().material.color = serverCubesColor;
         clientCubes.Add(newUserId, newClient);
 
@@ -187,6 +199,7 @@ public class ServerEntity : MonoBehaviour
 
         newClient.transform.position = clientPosition;
         newClient.name = $"ServerCube-{newUserId}";
+        newClient.gameObject.layer = LayerMask.NameToLayer("Server");
             
         clientCount++;
 

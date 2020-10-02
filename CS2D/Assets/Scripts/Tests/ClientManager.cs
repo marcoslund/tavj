@@ -17,7 +17,10 @@ public class ClientManager : MonoBehaviour
     private Dictionary<int, float> clientConnectionsTimeouts;
     public const float ClientConnectionTimeout = 1f;
     
-    public GameObject clientPrefab;
+    public GameObject cubePrefab;
+
+    public int maxClientCount = 10;
+    private int usedClientLayersCount = 1;
     
     // Start is called before the first frame update
     void Start()
@@ -37,11 +40,14 @@ public class ClientManager : MonoBehaviour
             // Make packet, send to server with timeout,
             // wait for response with userID and channel ports, and then instantiate cube (with associated color),
             // which will recieve snapshots separately
-            
-            int userId = Random.Range(0, int.MaxValue); // Collisions are unlikely for the time being
-            SendClientConnection(userId);
-            clientConnectionsTimeouts.Add(userId, ClientConnectionTimeout);
-            clientCounter++;
+
+            if (clientCounter < maxClientCount)
+            {
+                int userId = Random.Range(0, int.MaxValue); // Collisions are unlikely for the time being
+                SendClientConnection(userId);
+                clientConnectionsTimeouts.Add(userId, ClientConnectionTimeout);
+                clientCounter++;
+            }
         }
 
         var packet = serverEntity.sendChannel.GetPacket();//recvChannel.GetPacket();
@@ -93,8 +99,10 @@ public class ClientManager : MonoBehaviour
             {
                 clientConnectionsTimeouts.Remove(userId);
                 
-                GameObject newClient = Instantiate(clientPrefab, transform);
+                GameObject newClient = Instantiate(cubePrefab, transform);
                 newClient.name = $"ClientCube-{userId}";
+                newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
+                
                 ClientEntity clientEntityComponent = newClient.AddComponent<ClientEntity>();
                 
                 int sendPort = buffer.GetInt();
@@ -118,7 +126,8 @@ public class ClientManager : MonoBehaviour
                     Random.Range(0f, 1f)
                 );
                 
-                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, minBufferElems, clientColor, position, rotation, this);
+                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, minBufferElems, clientColor, position, rotation, usedClientLayersCount, this);
+                usedClientLayersCount++;
                 
                 int connectedPlayerCount = buffer.GetByte();
                 for (int i = 0; i < connectedPlayerCount; i++)

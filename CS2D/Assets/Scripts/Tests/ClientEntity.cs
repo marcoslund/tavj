@@ -26,8 +26,10 @@ public class ClientEntity : MonoBehaviour
 
     private ClientManager clientManager;
 
-    public void Initialize(int sendPort, int recvPort, int userId, float time, int minInterpolationBufferElems, Color clientColor,
-        Vector3 position, Quaternion rotation, ClientManager clientManager)
+    private int clientLayer;
+
+    public void Initialize(int sendPort, int recvPort, int userId, float time, int minInterpolationBufferElems,
+        Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, ClientManager clientManager)
     {
         this.sendPort = sendPort;
         //sendChannel = new Channel(sendPort);
@@ -43,6 +45,8 @@ public class ClientEntity : MonoBehaviour
 
         transform.position = position;
         transform.rotation = rotation;
+
+        this.clientLayer = clientLayer;
 
         this.clientManager = clientManager;
     }
@@ -85,7 +89,7 @@ public class ClientEntity : MonoBehaviour
             Interpolate(interpolationBuffer[0], interpolationBuffer[1], t);
         }
     }
-    
+
     private void ReadClientInput()
     {
         Commands currentCommands = new Commands(
@@ -278,8 +282,9 @@ public class ClientEntity : MonoBehaviour
 
     public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
     {
-        GameObject newClient = (GameObject) Instantiate(Resources.Load("CubeClient"), position, rotation, transform);
+        GameObject newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
         newClient.name = $"ClientCube-{connectedPlayerId}";
+        newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
         newClient.GetComponent<Renderer>().material.color = clientColor;
