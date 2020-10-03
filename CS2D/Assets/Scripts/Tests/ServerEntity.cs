@@ -44,7 +44,12 @@ public class ServerEntity : MonoBehaviour
 
     private Color serverCubesColor = Color.white;
     private float floorSide = 4.5f; // Hardcoded
-    private float initY = 0.6f;
+    private float initY = 2f;//0.6f;
+    
+    private Dictionary<int, Vector3> playerVelocities = new Dictionary<int, Vector3>();
+    public float playerSpeed = 2.0f;
+    public float jumpHeight = 1.0f;
+    public float gravityValue = -9.81f;
     
     // Start is called before the first frame update
     void Awake() {
@@ -124,13 +129,44 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private void ApplyGravityToClients()
+    private void ApplyGravityToClients() // CHANGE!
     {
-        foreach (var client in clientCubes.Values)
+        var space = Input.GetKeyDown(KeyCode.Space);
+        
+        foreach (var client in clientCubes)
         {
-            if (!client.isGrounded){
+            /*if (!client.isGrounded){
                client.SimpleMove(Vector3.zero);
+            }*/
+
+            var clientId = client.Key;
+            var controller = client.Value;
+            var velocity = playerVelocities[clientId];
+            
+            var groundedPlayer = controller.isGrounded;
+            if (groundedPlayer && velocity.y < 0)
+            {
+                velocity.y = - controller.stepOffset / Time.deltaTime;
             }
+            
+            Vector3 move = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+            controller.Move(move * (Time.deltaTime * playerSpeed));
+
+            /*if (move != Vector3.zero)
+            {
+                controller.transform.forward = move;
+            }*/
+            
+            // Changes the height position of the player..
+            if (space && groundedPlayer)
+            {
+                velocity.y = Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
+            }
+            
+            velocity.y += gravityValue * Time.deltaTime;
+            controller.Move(velocity * Time.deltaTime);
+            
+            playerVelocities[clientId] = velocity;
         }
     }
 
@@ -154,19 +190,19 @@ public class ServerEntity : MonoBehaviour
     {
         //apply input
         if (commands.Space) {
-            //clientRigidbody.AddForceAtPosition(Vector3.up * 5, Vector3.zero, ForceMode.Impulse);
+            //client.attachedRigidbody.AddForceAtPosition(Vector3.up * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Left) {
-            //clientRigidbody.AddForceAtPosition(Vector3.left * 5, Vector3.zero, ForceMode.Impulse);
+            //client.attachedRigidbody.AddForceAtPosition(Vector3.left * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Right) {
-            //clientRigidbody.AddForceAtPosition(Vector3.right * 5, Vector3.zero, ForceMode.Impulse);
+            //client.attachedRigidbody.AddForceAtPosition(Vector3.right * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Up) {
-            //clientRigidbody.AddForceAtPosition(Vector3.forward * 5, Vector3.zero, ForceMode.Impulse);
+            //client.attachedRigidbody.AddForceAtPosition(Vector3.forward * 5, Vector3.zero, ForceMode.Impulse);
         }
         if (commands.Down) {
-            //clientRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
+            //client.attachedRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
         }
     }
 
@@ -200,6 +236,8 @@ public class ServerEntity : MonoBehaviour
         newClient.transform.position = clientPosition;
         newClient.name = $"ServerCube-{newUserId}";
         newClient.gameObject.layer = LayerMask.NameToLayer("Server");
+        
+        playerVelocities.Add(newUserId, Vector3.zero);
             
         clientCount++;
 
