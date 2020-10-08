@@ -46,9 +46,11 @@ public class ServerEntity : MonoBehaviour
     private float floorSide = 4.5f; // Hardcoded
     private float initY = 2f;//0.6f;
     
-    private Dictionary<int, Vector3> playerVelocities = new Dictionary<int, Vector3>();
+    private Dictionary<int, List<Commands>> recievedCommands = new Dictionary<int, List<Commands>>();
+    private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
     public float playerSpeed = 2.0f;
     public float jumpHeight = 1.0f;
+    public float jumpSpeed = 10.0f;
     public float gravityValue = -9.81f;
     
     // Start is called before the first frame update
@@ -74,11 +76,20 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
+    private void FixedUpdate()
+    {
+        foreach (var client in clientCubes)
+        {
+            var clientId = client.Key;
+            var controller = client.Value;
+            var velocity = playerVelocitiesY[clientId];
+            MovePlayer(clientId, controller, velocity, recievedCommands[clientId]);
+        }
+    }
+
     private void UpdateServer()
     {
         serverTime += Time.deltaTime;
-
-        ApplyGravityToClients();
 
         ListenForPlayerConnections();
         
@@ -129,45 +140,41 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private void ApplyGravityToClients() // CHANGE!
+    private void MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> recievedCommands)
     {
-        var space = Input.GetKeyDown(KeyCode.Space);
+        Vector3 move = Vector3.zero;
+        bool canJump = false;
         
-        foreach (var client in clientCubes)
+        if (!controller.isGrounded)
         {
-            /*if (!client.isGrounded){
-               client.SimpleMove(Vector3.zero);
-            }*/
-
-            var clientId = client.Key;
-            var controller = client.Value;
-            var velocity = playerVelocities[clientId];
-            
-            var groundedPlayer = controller.isGrounded;
-            if (groundedPlayer && velocity.y < 0)
-            {
-                velocity.y = - controller.stepOffset / Time.deltaTime;
-            }
-            
-            Vector3 move = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
-            controller.Move(move * (Time.deltaTime * playerSpeed));
-
-            /*if (move != Vector3.zero)
-            {
-                controller.transform.forward = move;
-            }*/
-            
-            // Changes the height position of the player..
-            if (space && groundedPlayer)
-            {
-                velocity.y = Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
-            }
-            
-            velocity.y += gravityValue * Time.deltaTime;
-            controller.Move(velocity * Time.deltaTime);
-            
-            playerVelocities[clientId] = velocity;
+            velocity += gravityValue * Time.fixedDeltaTime;
+            move.y = velocity * Time.fixedDeltaTime;
         }
+        else
+        {
+            velocity = gravityValue * Time.fixedDeltaTime;
+            move.y = gravityValue * Time.fixedDeltaTime;
+            canJump = true;
+        }
+        
+        foreach (var commands in recievedCommands)
+        {
+            move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
+            move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
+            
+            if (commands.Space && controller.isGrounded && canJump)
+            {
+                velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
+                move.y += velocity * Time.fixedDeltaTime;
+                canJump = false;
+            }
+            
+        }
+        
+        controller.Move(move);
+        
+        recievedCommands.Clear();
+        playerVelocitiesY[clientId] = velocity;
     }
 
     private void SendSnapshotToClient(int clientId/*, BitBuffer snapshotBuffer*/)
@@ -186,7 +193,7 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void ExecuteClientInput(CharacterController client, Commands commands)
+    /*private void ExecuteClientInput(CharacterController client, Commands commands)
     {
         //apply input
         if (commands.Space) {
@@ -204,7 +211,7 @@ public class ServerEntity : MonoBehaviour
         if (commands.Down) {
             //client.attachedRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
         }
-    }
+    }*/
 
     private void ListenForPlayerConnections()
     {
@@ -237,7 +244,8 @@ public class ServerEntity : MonoBehaviour
         newClient.name = $"ServerCube-{newUserId}";
         newClient.gameObject.layer = LayerMask.NameToLayer("Server");
         
-        playerVelocities.Add(newUserId, Vector3.zero);
+        recievedCommands.Add(newUserId, new List<Commands>());
+        playerVelocitiesY.Add(newUserId, 0);
             
         clientCount++;
 
@@ -375,10 +383,12 @@ public class ServerEntity : MonoBehaviour
             
             Commands commands = new Commands(
                 seq,
+                /*buffer.GetInt() > 0,
                 buffer.GetInt() > 0,
                 buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,*/
+                buffer.GetFloat(),
+                buffer.GetFloat(),
                 buffer.GetInt() > 0);
             
             commandsList.Add(commands);
@@ -393,7 +403,8 @@ public class ServerEntity : MonoBehaviour
         foreach (Commands commands in commandsList)
         {
             receivedCommandSequence = commands.Seq;
-            ExecuteClientInput(clientCubes[clientId], commands);
+            recievedCommands[clientId].Add(commands);
+            //ExecuteClientInput(clientCubes[clientId], commands);
         }
         
         var packet = Packet.Obtain();

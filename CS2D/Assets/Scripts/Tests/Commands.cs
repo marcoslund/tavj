@@ -6,53 +6,60 @@ namespace Tests
     {
         private static int _seq = 0;
         private int seq;
-        private bool up;
-        private bool down;
-        private bool right;
-        private bool left;
+        private float horizontal;
+        private float vertical;
         private bool space;
 
-        public Commands(bool up, bool down, bool right, bool left, bool space)
+        public Commands(float vertical, float horizontal, bool space)
         {
             this.seq = _seq;
-            this.up = up;
-            this.down = down;
-            this.right = right;
-            this.left = left;
+            this.vertical = vertical;
+            //this.up = up;
+            //this.down = down;
+            this.horizontal = horizontal;
+            //this.right = right;
+            //this.left = left;
             this.space = space;
             if (hasCommand())
                 _seq++;
         }
 
-        public override string ToString()
+        /*public override string ToString()
         {
             return $"{nameof(Seq)}: {Seq}, {nameof(Up)}: {Up}, {nameof(Down)}: {Down}, {nameof(Right)}: {Right}, {nameof(Left)}: {Left}, {nameof(Space)}: {Space}";
-        }
+        }*/
 
-        public Commands(int seq, bool up, bool down, bool right, bool left, bool space)
+        public Commands(int seq, float vertical, float horizontal, bool space)
         {
             this.seq = seq;
-            this.up = up;
-            this.down = down;
-            this.right = right;
-            this.left = left;
+            this.vertical = vertical;
+            //this.up = up;
+            //this.down = down;
+            this.horizontal = horizontal;
+            //this.right = right;
+            //this.left = left;
             this.space = space;
         }
 
         public bool hasCommand()
         {
-            return up || down || right || left || space;
+            //return up || down || right || left || space;
+            return (vertical != 0f) || (horizontal != 0f) || space;
         }
 
         public int Seq => seq;
+
+        public float Vertical => vertical;
+
+        //public bool Up => up;
+
+        //public bool Down => down;
         
-        public bool Up => up;
+        public float Horizontal => horizontal;
 
-        public bool Down => down;
+        //public bool Right => right;
 
-        public bool Right => right;
-
-        public bool Left => left;
+        //public bool Left => left;
 
         public bool Space => space;
     }

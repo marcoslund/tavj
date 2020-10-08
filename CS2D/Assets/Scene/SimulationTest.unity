@@ -298,6 +298,9 @@ MonoBehaviour:
   clientCount: 0
   minInterpolationBufferElems: 2
   pps: 60
+  playerSpeed: 0.1
+  jumpHeight: 1
+  gravityValue: -9.81
 --- !u!4 &803758058
 Transform:
   m_ObjectHideFlags: 0

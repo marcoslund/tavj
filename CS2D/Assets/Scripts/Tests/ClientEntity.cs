@@ -93,10 +93,12 @@ public class ClientEntity : MonoBehaviour
     private void ReadClientInput()
     {
         Commands currentCommands = new Commands(
-            Input.GetKeyDown(KeyCode.UpArrow),
-            Input.GetKeyDown(KeyCode.DownArrow),
-            Input.GetKeyDown(KeyCode.RightArrow),
-            Input.GetKeyDown(KeyCode.LeftArrow),
+            /*Input.GetKey(KeyCode.UpArrow),
+            Input.GetKey(KeyCode.DownArrow),
+            Input.GetKey(KeyCode.RightArrow),
+            Input.GetKey(KeyCode.LeftArrow),*/
+            Input.GetAxisRaw("Vertical"),
+            Input.GetAxisRaw("Horizontal"),
             Input.GetKeyDown(KeyCode.Space)
         );
         
@@ -242,10 +244,12 @@ public class ClientEntity : MonoBehaviour
         foreach (Commands commands in commands)
         {
             buffer.PutInt(commands.Seq);
-            buffer.PutInt(commands.Up ? 1 : 0);
+            /*buffer.PutInt(commands.Up ? 1 : 0);
             buffer.PutInt(commands.Down ? 1 : 0);
             buffer.PutInt(commands.Right ? 1 : 0);
-            buffer.PutInt(commands.Left ? 1 : 0);
+            buffer.PutInt(commands.Left ? 1 : 0);*/
+            buffer.PutFloat(commands.Vertical);
+            buffer.PutFloat(commands.Horizontal);
             buffer.PutInt(commands.Space ? 1 : 0);
         }
     }
