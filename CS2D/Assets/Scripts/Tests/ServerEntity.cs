@@ -47,11 +47,13 @@ public class ServerEntity : MonoBehaviour
     private float initY = 2f;//0.6f;
     
     private Dictionary<int, List<Commands>> recievedCommands = new Dictionary<int, List<Commands>>();
-    private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
+    //private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
     public float playerSpeed = 2.0f;
     public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;
     public float gravityValue = -9.81f;
+
+    private Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
     
     // Start is called before the first frame update
     void Awake() {
@@ -82,8 +84,8 @@ public class ServerEntity : MonoBehaviour
         {
             var clientId = client.Key;
             var controller = client.Value;
-            var velocity = playerVelocitiesY[clientId];
-            MovePlayer(clientId, controller, velocity, recievedCommands[clientId]);
+            //var velocity = playerVelocitiesY[clientId];
+            MovePlayer(clientId, controller, /*velocity,*/ recievedCommands[clientId]);
         }
     }
 
@@ -140,10 +142,10 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private void MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> recievedCommands)
+    private void MovePlayer(int clientId, CharacterController controller, /*float velocity,*/ List<Commands> recievedCommands)
     {
         Vector3 move = Vector3.zero;
-        bool canJump = false;
+        /*bool canJump = false;
         
         if (!controller.isGrounded)
         {
@@ -155,26 +157,26 @@ public class ServerEntity : MonoBehaviour
             velocity = gravityValue * Time.fixedDeltaTime;
             move.y = gravityValue * Time.fixedDeltaTime;
             canJump = true;
-        }
+        }*/
         
         foreach (var commands in recievedCommands)
         {
             move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
             move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
             
-            if (commands.Space && controller.isGrounded && canJump)
+            /*if (commands.Space && controller.isGrounded && canJump)
             {
                 velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
                 move.y += velocity * Time.fixedDeltaTime;
                 canJump = false;
-            }
+            }*/
             
         }
         
         controller.Move(move);
         
         recievedCommands.Clear();
-        playerVelocitiesY[clientId] = velocity;
+        //playerVelocitiesY[clientId] = velocity;
     }
 
     private void SendSnapshotToClient(int clientId/*, BitBuffer snapshotBuffer*/)
@@ -183,7 +185,7 @@ public class ServerEntity : MonoBehaviour
         
         //snapshotBuffer.CopyTo(packet.buffer, snapshotBuffer.GetCurrentBitCount() * ); TODO OPTIMIZE
         
-        SerializationManager.ServerWorldSerialize(packet.buffer, clientCubes, nextSnapshotSeq, serverTime);
+        SerializationManager.ServerWorldSerialize(packet.buffer, clientCubes, nextSnapshotSeq, serverTime, playerRecvCmdSeq[clientId]);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -192,26 +194,6 @@ public class ServerEntity : MonoBehaviour
 
         packet.Free();
     }
-
-    /*private void ExecuteClientInput(CharacterController client, Commands commands)
-    {
-        //apply input
-        if (commands.Space) {
-            //client.attachedRigidbody.AddForceAtPosition(Vector3.up * 5, Vector3.zero, ForceMode.Impulse);
-        }
-        if (commands.Left) {
-            //client.attachedRigidbody.AddForceAtPosition(Vector3.left * 5, Vector3.zero, ForceMode.Impulse);
-        }
-        if (commands.Right) {
-            //client.attachedRigidbody.AddForceAtPosition(Vector3.right * 5, Vector3.zero, ForceMode.Impulse);
-        }
-        if (commands.Up) {
-            //client.attachedRigidbody.AddForceAtPosition(Vector3.forward * 5, Vector3.zero, ForceMode.Impulse);
-        }
-        if (commands.Down) {
-            //client.attachedRigidbody.AddForceAtPosition(Vector3.back * 5, Vector3.zero, ForceMode.Impulse);
-        }
-    }*/
 
     private void ListenForPlayerConnections()
     {
@@ -245,7 +227,9 @@ public class ServerEntity : MonoBehaviour
         newClient.gameObject.layer = LayerMask.NameToLayer("Server");
         
         recievedCommands.Add(newUserId, new List<Commands>());
-        playerVelocitiesY.Add(newUserId, 0);
+        //playerVelocitiesY.Add(newUserId, 0);
+        
+        playerRecvCmdSeq.Add(newUserId, 0);
             
         clientCount++;
 
@@ -357,7 +341,7 @@ public class ServerEntity : MonoBehaviour
 
     private void DeserializeClientMessage(BitBuffer buffer, int clientId)
     {
-        PacketType messageType = (PacketType) buffer.GetInt();
+        PacketType messageType = (PacketType) buffer.GetByte();//(PacketType) buffer.GetInt();
         
         switch (messageType)
         {
@@ -376,23 +360,23 @@ public class ServerEntity : MonoBehaviour
     private List<Commands> DeserializeCommands(BitBuffer buffer)
     {
         List<Commands> commandsList = new List<Commands>();
-        
-        while (buffer.HasRemaining())
+        int playerId = buffer.GetInt();
+        int storedCommandLists = buffer.GetInt();
+        int seq = 0;
+        for(int i = 0; i < storedCommandLists; i++)
         {
-            int seq = buffer.GetInt();
+            seq = buffer.GetInt();
             
             Commands commands = new Commands(
                 seq,
-                /*buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,*/
                 buffer.GetFloat(),
                 buffer.GetFloat(),
                 buffer.GetInt() > 0);
             
             commandsList.Add(commands);
         }
+
+        playerRecvCmdSeq[playerId] = seq;
 
         return commandsList;
     }

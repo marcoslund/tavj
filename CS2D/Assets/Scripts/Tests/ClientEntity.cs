@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using Tests;
 using UnityEngine;
@@ -18,15 +19,25 @@ public class ClientEntity : MonoBehaviour
     public bool isPlaying;
 
     public List<Snapshot> interpolationBuffer = new List<Snapshot>();
-    public List<Commands> commands = new List<Commands>();
+    public List<Commands> unAckedCommands = new List<Commands>();
     public int minInterpolationBufferElems;
+
+    private int commandSeq = 1;
+    private List<Commands> predictionCommands = new List<Commands>();
+    private Dictionary<int, Vector3> positionHistory = new Dictionary<int, Vector3>(); // (Frame number, Position)
+    private const float PredictionEpsilon = 0.01f;
 
     private Dictionary<int, Transform> otherClientCubes = new Dictionary<int, Transform>();
     private Color clientColor;
 
     private ClientManager clientManager;
 
+    private CharacterController _characterController;
     private int clientLayer;
+    public float playerSpeed = 2.0f;
+    public float jumpHeight = 1.0f;
+    public float jumpSpeed = 10.0f;
+    public float gravityValue = -9.81f;
 
     public void Initialize(int sendPort, int recvPort, int userId, float time, int minInterpolationBufferElems,
         Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, ClientManager clientManager)
@@ -46,6 +57,7 @@ public class ClientEntity : MonoBehaviour
         transform.position = position;
         transform.rotation = rotation;
 
+        _characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
 
         this.clientManager = clientManager;
@@ -62,8 +74,6 @@ public class ClientEntity : MonoBehaviour
             Deserialize(buffer);
         }
 
-        ReadClientInput();
-
         if (interpolationBuffer.Count >= minInterpolationBufferElems)
             isPlaying = true;
         else if (interpolationBuffer.Count <= 1)
@@ -71,6 +81,8 @@ public class ClientEntity : MonoBehaviour
         
         if (isPlaying)
         {
+            ReadClientInput();
+            
             time += Time.deltaTime;
             var previousTime = interpolationBuffer[0].Time;
             var nextTime = interpolationBuffer[1].Time;
@@ -93,10 +105,7 @@ public class ClientEntity : MonoBehaviour
     private void ReadClientInput()
     {
         Commands currentCommands = new Commands(
-            /*Input.GetKey(KeyCode.UpArrow),
-            Input.GetKey(KeyCode.DownArrow),
-            Input.GetKey(KeyCode.RightArrow),
-            Input.GetKey(KeyCode.LeftArrow),*/
+            commandSeq,
             Input.GetAxisRaw("Vertical"),
             Input.GetAxisRaw("Horizontal"),
             Input.GetKeyDown(KeyCode.Space)
@@ -104,7 +113,10 @@ public class ClientEntity : MonoBehaviour
         
         if (currentCommands.hasCommand())
         {
-            commands.Add(currentCommands);
+            Debug.Log("CREATED COMMANDS WITH SEQ " + commandSeq);
+            MovePlayer(new List<Commands>() {currentCommands});
+            unAckedCommands.Add(currentCommands);
+            predictionCommands.Add(currentCommands);
             // Serialize & send commands to server
             var packet = Packet.Obtain();
             SerializeCommands(packet.buffer);
@@ -115,6 +127,9 @@ public class ClientEntity : MonoBehaviour
             clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
 
             packet.Free();
+            
+            positionHistory.Add(commandSeq, transform.position);
+            commandSeq++;
         }
     }
     
@@ -123,7 +138,7 @@ public class ClientEntity : MonoBehaviour
         var position = new Vector3();
         var rotation = new Quaternion();
 
-        position.x = InterpolateAxis(prevSnapshot.Positions[userId].x, nextSnapshot.Positions[userId].x, t);
+        /*position.x = InterpolateAxis(prevSnapshot.Positions[userId].x, nextSnapshot.Positions[userId].x, t);
         position.y = InterpolateAxis(prevSnapshot.Positions[userId].y, nextSnapshot.Positions[userId].y, t);
         position.z = InterpolateAxis(prevSnapshot.Positions[userId].z, nextSnapshot.Positions[userId].z, t);
     
@@ -133,7 +148,7 @@ public class ClientEntity : MonoBehaviour
         rotation.z = InterpolateAxis(prevSnapshot.Rotations[userId].z, nextSnapshot.Rotations[userId].z, t);
     
         transform.position = position;
-        transform.rotation = rotation;
+        transform.rotation = rotation;*/
         
         foreach (var clientCubePair in otherClientCubes)
         {
@@ -178,7 +193,7 @@ public class ClientEntity : MonoBehaviour
             {
                 int receivedAckSequence = DeserializeAck(buffer);
                 int lastAckedCommandsIndex = 0;
-                foreach (var commands in commands)
+                foreach (var commands in unAckedCommands)
                 {
                     if (commands.Seq > receivedAckSequence)
                     {
@@ -186,7 +201,7 @@ public class ClientEntity : MonoBehaviour
                     }
                     lastAckedCommandsIndex++;
                 }
-                commands.RemoveRange(0, lastAckedCommandsIndex);
+                unAckedCommands.RemoveRange(0, lastAckedCommandsIndex);
                 break;
             }
             case PacketType.PlayerJoined:
@@ -204,6 +219,7 @@ public class ClientEntity : MonoBehaviour
         if (seq < displaySeq) return;
         
         var time = buffer.GetFloat();
+        var recvCmdSeq = buffer.GetInt();
         var clientCount = buffer.GetByte();
 
         Dictionary<int, Vector3> positions = new Dictionary<int, Vector3>();
@@ -226,6 +242,36 @@ public class ClientEntity : MonoBehaviour
             
             positions.Add(clientId, position);
             rotations.Add(clientId, rotation);
+
+            if (clientId == userId && predictionCommands.Count > 0)
+            {
+                // Delete saved command sequences based on received sequence number
+                int toRemoveCmdIndex = 0;
+                foreach (var commands in predictionCommands)
+                {
+                    if (commands.Seq > recvCmdSeq) break;
+                    toRemoveCmdIndex++;
+                }
+                predictionCommands.RemoveRange(0, toRemoveCmdIndex);
+                
+                Debug.Log("CHECKING POSITION EPSILON... " + recvCmdSeq);
+                foreach (var x in positionHistory)
+                {
+                    Debug.Log($"{x.Key} ({x.Value.x} {x.Value.y} {x.Value.z})");
+                }
+                
+                // Check if received position differs much from predicted position
+                if (Vector3.Distance(position, positionHistory[recvCmdSeq]) > PredictionEpsilon)
+                {
+                    Debug.Log("Applying prediction correction... distance: " + Vector3.Distance(position, positionHistory[recvCmdSeq]) + " recv position: (" + 
+                              position.x + " " + position.y + " " + position.z + ")");
+                    transform.position = position;
+                    MovePlayer(predictionCommands);
+                }
+
+                positionHistory = positionHistory.Where(kvp => kvp.Key > recvCmdSeq)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
         }
         
         Snapshot snapshot = new Snapshot(seq, time, positions, rotations);
@@ -237,11 +283,48 @@ public class ClientEntity : MonoBehaviour
         }
         interpolationBuffer.Insert(bufferIndex, snapshot);
     }
+    
+    private void MovePlayer(/*float velocity,*/ List<Commands> commandsList)
+    {
+        Vector3 move = Vector3.zero;
+        /*bool canJump = false;
+        
+        if (!_characterController.isGrounded)
+        {
+            velocity += gravityValue * Time.fixedDeltaTime;
+            move.y = velocity * Time.fixedDeltaTime;
+        }
+        else
+        {
+            velocity = gravityValue * Time.fixedDeltaTime;
+            move.y = gravityValue * Time.fixedDeltaTime;
+            canJump = true;
+        }*/
+        
+        foreach (var commands in commandsList)
+        {
+            move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
+            move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
+            
+            /*if (commands.Space && _characterController.isGrounded && canJump)
+            {
+                velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
+                move.y += velocity * Time.fixedDeltaTime;
+                canJump = false;
+            }*/
+            
+        }
+        
+        _characterController.Move(move);
+        //playerVelocitiesY[clientId] = velocity;
+    }
 
     public void SerializeCommands(BitBuffer buffer)
     {
-        buffer.PutInt((int) PacketType.Commands);
-        foreach (Commands commands in commands)
+        buffer.PutByte((int) PacketType.Commands);//buffer.PutInt((int) PacketType.Commands);
+        buffer.PutInt(userId);
+        buffer.PutInt(unAckedCommands.Count);
+        foreach (Commands commands in unAckedCommands)
         {
             buffer.PutInt(commands.Seq);
             /*buffer.PutInt(commands.Up ? 1 : 0);

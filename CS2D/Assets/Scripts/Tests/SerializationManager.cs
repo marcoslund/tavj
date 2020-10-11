@@ -5,10 +5,12 @@ using UnityEngine;
 
 public class SerializationManager
 {
-    public static void ServerWorldSerialize(BitBuffer buffer, Dictionary<int, CharacterController> clients, int snapshotSeq, float serverTime) {
+    public static void ServerWorldSerialize(BitBuffer buffer, Dictionary<int, CharacterController> clients,
+        int snapshotSeq, float serverTime, int recvCmdSeq) {
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
+        buffer.PutInt(recvCmdSeq);
         buffer.PutByte(clients.Count);
 
         foreach (var client in clients)
