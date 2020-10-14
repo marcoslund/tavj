@@ -24,8 +24,8 @@ public class ClientEntity : MonoBehaviour
 
     private int commandSeq = 1;
     private List<Commands> predictionCommands = new List<Commands>();
-    private Dictionary<int, Vector3> positionHistory = new Dictionary<int, Vector3>(); // (Frame number, Position)
-    private const float PredictionEpsilon = 0.01f;
+    private const float PredictionEpsilon = 0.1f;
+    private CharacterController predictionCopy;
 
     private Dictionary<int, Transform> otherClientCubes = new Dictionary<int, Transform>();
     private Color clientColor;
@@ -40,7 +40,8 @@ public class ClientEntity : MonoBehaviour
     public float gravityValue = -9.81f;
 
     public void Initialize(int sendPort, int recvPort, int userId, float time, int minInterpolationBufferElems,
-        Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, ClientManager clientManager)
+        Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, GameObject predictionCopy,
+        ClientManager clientManager)
     {
         this.sendPort = sendPort;
         //sendChannel = new Channel(sendPort);
@@ -61,6 +62,12 @@ public class ClientEntity : MonoBehaviour
         this.clientLayer = clientLayer;
 
         this.clientManager = clientManager;
+
+        this.predictionCopy = predictionCopy.GetComponent<CharacterController>();
+        predictionCopy.GetComponent<Renderer>().enabled = false;
+        predictionCopy.transform.position = position;
+        predictionCopy.transform.rotation = rotation;
+        Physics.IgnoreCollision(_characterController, this.predictionCopy);
     }
 
     private void Update()
@@ -113,7 +120,6 @@ public class ClientEntity : MonoBehaviour
         
         if (currentCommands.hasCommand())
         {
-            Debug.Log("CREATED COMMANDS WITH SEQ " + commandSeq);
             MovePlayer(new List<Commands>() {currentCommands});
             unAckedCommands.Add(currentCommands);
             predictionCommands.Add(currentCommands);
@@ -128,7 +134,6 @@ public class ClientEntity : MonoBehaviour
 
             packet.Free();
             
-            positionHistory.Add(commandSeq, transform.position);
             commandSeq++;
         }
     }
@@ -243,7 +248,7 @@ public class ClientEntity : MonoBehaviour
             positions.Add(clientId, position);
             rotations.Add(clientId, rotation);
 
-            if (clientId == userId && predictionCommands.Count > 0)
+            if (clientId == userId)
             {
                 // Delete saved command sequences based on received sequence number
                 int toRemoveCmdIndex = 0;
@@ -254,23 +259,29 @@ public class ClientEntity : MonoBehaviour
                 }
                 predictionCommands.RemoveRange(0, toRemoveCmdIndex);
                 
-                Debug.Log("CHECKING POSITION EPSILON... " + recvCmdSeq);
-                foreach (var x in positionHistory)
+                // Aplicarle a la posicion recibida todos los inputs faltantes y comparar con mi posicion
+                // Si es muy grande la diferencia cambiarla a esa
+                predictionCopy.transform.position = position;
+                Vector3 move = Vector3.zero;
+                foreach (var commands in predictionCommands)
                 {
-                    Debug.Log($"{x.Key} ({x.Value.x} {x.Value.y} {x.Value.z})");
+                    move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
+                    move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
                 }
+                predictionCopy.Move(move);
                 
                 // Check if received position differs much from predicted position
-                if (Vector3.Distance(position, positionHistory[recvCmdSeq]) > PredictionEpsilon)
+                //Debug.Log(Vector3.Distance(transform.position, predictionCopy.transform.position));
+                if (Vector3.Distance(transform.position, predictionCopy.transform.position) > PredictionEpsilon)
                 {
-                    Debug.Log("Applying prediction correction... distance: " + Vector3.Distance(position, positionHistory[recvCmdSeq]) + " recv position: (" + 
-                              position.x + " " + position.y + " " + position.z + ")");
-                    transform.position = position;
-                    MovePlayer(predictionCommands);
+                    /*Debug.Log($"CORRECTION {Vector3.Distance(transform.position, predictionCopy.transform.position)} (" +
+                              $"{transform.position.x} {transform.position.y} {transform.position.z}) ({predictionCopy.transform.position.x} " +
+                              $"{predictionCopy.transform.position.y} {predictionCopy.transform.position.z})");*/
+                    
+                    transform.position = predictionCopy.transform.position;
+                    
+                    //Debug.Log($"NEW POSITION ({transform.position.x} {transform.position.y} {transform.position.z})");
                 }
-
-                positionHistory = positionHistory.Where(kvp => kvp.Key > recvCmdSeq)
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
         }
         

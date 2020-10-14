@@ -373,7 +373,8 @@ public class ServerEntity : MonoBehaviour
                 buffer.GetFloat(),
                 buffer.GetInt() > 0);
             
-            commandsList.Add(commands);
+            if(playerRecvCmdSeq[playerId] > seq)
+                commandsList.Add(commands);
         }
 
         playerRecvCmdSeq[playerId] = seq;
