@@ -127,11 +127,11 @@ public class ClientManager : MonoBehaviour
                     Random.Range(0f, 1f)
                 );
                 
-                GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
-                predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
+                //GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
+                //predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
                 
-                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, seq, minBufferElems, clientColor, 
-                    position, rotation, usedClientLayersCount, predictionCopy, this);
+                clientEntityComponent.InitializeClientEntity(sendPort, recvPort, userId, time, seq, minBufferElems, clientColor, 
+                    position, rotation, usedClientLayersCount, /*predictionCopy,*/ this);
                 usedClientLayersCount++;
                 
                 int connectedPlayerCount = buffer.GetByte();

@@ -364,7 +364,7 @@ public class ServerEntity : MonoBehaviour
         int playerId = buffer.GetInt();
         int storedCommandLists = buffer.GetInt();
         int seq = 0;
-        Debug.Log("STORED CMDS: " + storedCommandLists);
+        //Debug.Log("STORED CMDS: " + storedCommandLists);
         for(int i = 0; i < storedCommandLists; i++)
         {
             seq = buffer.GetInt();
@@ -390,11 +390,11 @@ public class ServerEntity : MonoBehaviour
     
     private void ProcessReceivedInput(List<Commands> commandsList, int clientId)
     {
-        Debug.Log("SERVER - RECV COMMANDS:");
-        foreach (Commands commands in commandsList)
+        /*Debug.Log("SERVER - RECV COMMANDS:");*/
+        /*foreach (Commands commands in commandsList)
         {
             Debug.Log(commands);
-        }
+        }*/
         int receivedCommandSequence = -1;
         foreach (Commands commands in commandsList)
         {
@@ -402,7 +402,7 @@ public class ServerEntity : MonoBehaviour
             recievedCommands[clientId].Add(commands);
             //ExecuteClientInput(clientCubes[clientId], commands);
         }
-        Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
+        //Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
         
         var packet = Packet.Obtain();
         SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);

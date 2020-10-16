@@ -13,63 +13,60 @@ public class ClientEntity : MonoBehaviour
     //public Channel sendChannel;
     //public Channel recvChannel;
 
-    public int userId;
-    public int displaySeq = 0;
-    public float time = 0;
+    public int clientId;
+    public int displaySeq = 0; // Current min frame being used for interpolation
+    public float clientTime = 0;
     public bool isPlaying;
 
     public List<Snapshot> interpolationBuffer = new List<Snapshot>();
-    public List<Commands> unAckedCommands = new List<Commands>();
     public int minInterpolationBufferElems;
 
+    private Commands commandsToSend = new Commands();
+    public List<Commands> unAckedCommands = new List<Commands>();
     private List<Commands> predictionCommands = new List<Commands>();
-    private const float PredictionEpsilon = 0.1f;
-    private CharacterController predictionCopy;
+    //private CharacterController predictionCopy;
 
-    private Dictionary<int, Transform> otherClientCubes = new Dictionary<int, Transform>();
+    private Dictionary<int, Transform> otherPlayers = new Dictionary<int, Transform>();
     private Color clientColor;
-
-    private ClientManager clientManager;
 
     private CharacterController _characterController;
     private int clientLayer;
-    public float playerSpeed = 2.0f;
-    public float jumpHeight = 1.0f;
+    public float walkingSpeed = 2.0f;
+    /*public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;
-    public float gravityValue = -9.81f;
+    public float gravityValue = -9.81f;*/
     
-    private Commands commandsToSend = new Commands();
+    private ClientManager clientManager;
+    private Channel channel;
 
-    public void Initialize(int sendPort, int recvPort, int userId, float time, int seq, int minInterpolationBufferElems,
-        Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, GameObject predictionCopy,
-        ClientManager clientManager)
+    public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
+        int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, 
+        /*GameObject predictionCopy,*/ ClientManager clientManager)
     {
         this.sendPort = sendPort;
         //sendChannel = new Channel(sendPort);
         this.recvPort = recvPort;
         //recvChannel = new Channel(recvPort);
-        this.userId = userId;
-        this.time = time;
-        displaySeq = seq;
+        this.clientId = clientId;
+        this.clientTime = clientTime;
+        this.displaySeq = displaySeq;
         this.minInterpolationBufferElems = minInterpolationBufferElems;
         this.clientColor = clientColor;
-        
-        Renderer rend = GetComponent<Renderer>();
+        var rend = GetComponent<Renderer>();
         rend.material.color = clientColor;
-
         transform.position = position;
         transform.rotation = rotation;
-
         _characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
-
         this.clientManager = clientManager;
 
-        this.predictionCopy = predictionCopy.GetComponent<CharacterController>();
-        predictionCopy.GetComponent<Renderer>().enabled = false;
-        predictionCopy.transform.position = position;
-        predictionCopy.transform.rotation = rotation;
-        Physics.IgnoreCollision(_characterController, this.predictionCopy);
+        //this.predictionCopy = predictionCopy.GetComponent<CharacterController>();
+        //predictionCopy.GetComponent<Renderer>().enabled = false;
+        //predictionCopy.transform.position = position;
+        //predictionCopy.transform.rotation = rotation;
+        //Physics.IgnoreCollision(_characterController, this.predictionCopy);
+
+        channel = clientManager.serverEntity.toClientChannels[clientId]; // TO DELETE
     }
 
     private void FixedUpdate()
@@ -79,34 +76,21 @@ public class ClientEntity : MonoBehaviour
             MovePlayer(new List<Commands>() {commandsToSend});
             unAckedCommands.Add(new Commands(commandsToSend));
             predictionCommands.Add(new Commands(commandsToSend));
-            // Serialize & send commands to server
-            var packet = Packet.Obtain();
-            SerializeCommands(packet.buffer);
-            Debug.Log("CLIENT - SENDING " + unAckedCommands.Count + " COMMANDS TO SERVER, UP TO SEQ " + (commandsToSend.Seq));
-            packet.buffer.Flush();
-
-            string serverIP = "127.0.0.1";
-            var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-            clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
-
-            packet.Free();
-
+            SendCommands(unAckedCommands);
             commandsToSend.Seq++;
-            //commandsToSend.Reset();
         }
     }
 
     private void Update()
     {
-        var packet = clientManager.serverEntity.toClientChannels[userId].GetPacket();//recvChannel.GetPacket();
-
+        // Check for incoming packets
+        var packet = channel.GetPacket();//recvChannel.GetPacket();
         if (packet != null) {
             var buffer = packet.buffer;
-
-            // Deserialize
-            Deserialize(buffer);
+            DeserializeBuffer(buffer);
         }
-
+        
+        // Check if stored snapshot count is valid
         if (interpolationBuffer.Count >= minInterpolationBufferElems)
             isPlaying = true;
         else if (interpolationBuffer.Count <= 1)
@@ -114,115 +98,77 @@ public class ClientEntity : MonoBehaviour
         
         if (isPlaying)
         {
-            ReadClientInput();
-            
-            time += Time.deltaTime;
-            var previousTime = interpolationBuffer[0].Time;
-            var nextTime = interpolationBuffer[1].Time;
-            if (time >= nextTime) {
-                interpolationBuffer.RemoveAt(0);
-                displaySeq++;
-                if (interpolationBuffer.Count < 2)
-                {
-                    isPlaying = false;
-                    return;
-                }
-                previousTime = interpolationBuffer[0].Time;
-                nextTime =  interpolationBuffer[1].Time;
-            }
-            var t =  (time - previousTime) / (nextTime - previousTime);
-            Interpolate(interpolationBuffer[0], interpolationBuffer[1], t);
+            clientTime += Time.deltaTime;
+            ReadInput();
+            UpdateInterpolationBuffer();
+            if (!isPlaying) return;
+            Interpolate(interpolationBuffer[0], interpolationBuffer[1]);
         }
     }
 
-    private void ReadClientInput()
+    private void UpdateInterpolationBuffer()
+    {
+        // Remove header snapshot when time advances
+        var nextTime = interpolationBuffer[1].Time;
+        if (clientTime >= nextTime) {
+            interpolationBuffer.RemoveAt(0);
+            displaySeq++;
+            if (interpolationBuffer.Count < 2)
+            {
+                isPlaying = false;
+            }
+        }
+    }
+
+    // Update 'commandsToSend' variable if new input is read
+    private void ReadInput()
     {
         if (Input.GetKeyDown(KeyCode.UpArrow))
             commandsToSend.Up = true;
-        else if (Input.GetKeyUp(KeyCode.UpArrow))
+        else if (Input.GetKeyUp(KeyCode.UpArrow) || (commandsToSend.Up && !Input.GetKey(KeyCode.UpArrow))) // TO DELETE SECOND CHECK
             commandsToSend.Up = false;
         
         if (Input.GetKeyDown(KeyCode.DownArrow))
             commandsToSend.Down = true;
-        else if (Input.GetKeyUp(KeyCode.DownArrow))
+        else if (Input.GetKeyUp(KeyCode.DownArrow) || (commandsToSend.Down && !Input.GetKey(KeyCode.DownArrow))) // TO DELETE SECOND CHECK
             commandsToSend.Down = false;
         
         if (Input.GetKeyDown(KeyCode.LeftArrow))
             commandsToSend.Left = true;
-        else if (Input.GetKeyUp(KeyCode.LeftArrow))
+        else if (Input.GetKeyUp(KeyCode.LeftArrow) || (commandsToSend.Left && !Input.GetKey(KeyCode.LeftArrow))) // TO DELETE SECOND CHECK
             commandsToSend.Left = false;
         
         if (Input.GetKeyDown(KeyCode.RightArrow))
             commandsToSend.Right = true;
-        else if (Input.GetKeyUp(KeyCode.RightArrow))
+        else if (Input.GetKeyUp(KeyCode.RightArrow) || (commandsToSend.Right && !Input.GetKey(KeyCode.RightArrow))) // TO DELETE SECOND CHECK
             commandsToSend.Right = false;
-        
-        /*Commands currentCommands = new Commands(
-            commandSeq,
-            Input.GetAxisRaw("Vertical"),
-            Input.GetAxisRaw("Horizontal"),
-            Input.GetKeyDown(KeyCode.Space)
-        );
-        
-        if (currentCommands.hasCommand())
-        {
-            MovePlayer(new List<Commands>() {currentCommands});
-            unAckedCommands.Add(currentCommands);
-            predictionCommands.Add(currentCommands);
-            // Serialize & send commands to server
-            var packet = Packet.Obtain();
-            SerializeCommands(packet.buffer);
-            packet.buffer.Flush();
-
-            string serverIP = "127.0.0.1";
-            var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-            clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
-
-            packet.Free();
-            
-            commandSeq++;
-        }*/
     }
     
-    private void Interpolate(Snapshot prevSnapshot, Snapshot nextSnapshot, float t)
+    private void Interpolate(Snapshot prevSnapshot, Snapshot nextSnapshot)
     {
-        var position = new Vector3();
-        var rotation = new Quaternion();
-
-        /*position.x = InterpolateAxis(prevSnapshot.Positions[userId].x, nextSnapshot.Positions[userId].x, t);
-        position.y = InterpolateAxis(prevSnapshot.Positions[userId].y, nextSnapshot.Positions[userId].y, t);
-        position.z = InterpolateAxis(prevSnapshot.Positions[userId].z, nextSnapshot.Positions[userId].z, t);
-    
-        rotation.w = InterpolateAxis(prevSnapshot.Rotations[userId].w, nextSnapshot.Rotations[userId].w, t);
-        rotation.x = InterpolateAxis(prevSnapshot.Rotations[userId].x, nextSnapshot.Rotations[userId].x, t);
-        rotation.y = InterpolateAxis(prevSnapshot.Rotations[userId].y, nextSnapshot.Rotations[userId].y, t);
-        rotation.z = InterpolateAxis(prevSnapshot.Rotations[userId].z, nextSnapshot.Rotations[userId].z, t);
-    
-        transform.position = position;
-        transform.rotation = rotation;*/
+        var t =  (clientTime - prevSnapshot.Time) / (nextSnapshot.Time - prevSnapshot.Time);
         
-        foreach (var clientCubePair in otherClientCubes)
+        foreach (var playerTransformPair in otherPlayers)
         {
-            var clientId = clientCubePair.Key;
+            var playerId = playerTransformPair.Key;
 
-            if (prevSnapshot.Positions.ContainsKey(clientId))
-            {
-                position = new Vector3();
-                rotation = new Quaternion();
+            if (!prevSnapshot.Positions.ContainsKey(playerId)) continue;
             
-                position.x = InterpolateAxis(prevSnapshot.Positions[clientId].x, nextSnapshot.Positions[clientId].x, t);
-                position.y = InterpolateAxis(prevSnapshot.Positions[clientId].y, nextSnapshot.Positions[clientId].y, t);
-                position.z = InterpolateAxis(prevSnapshot.Positions[clientId].z, nextSnapshot.Positions[clientId].z, t);
+            var position = new Vector3();
+            var rotation = new Quaternion();
+            
+            position.x = InterpolateAxis(prevSnapshot.Positions[playerId].x, nextSnapshot.Positions[playerId].x, t);
+            position.y = InterpolateAxis(prevSnapshot.Positions[playerId].y, nextSnapshot.Positions[playerId].y, t);
+            position.z = InterpolateAxis(prevSnapshot.Positions[playerId].z, nextSnapshot.Positions[playerId].z, t);
     
-                rotation.w = InterpolateAxis(prevSnapshot.Rotations[clientId].w, nextSnapshot.Rotations[clientId].w, t);
-                rotation.x = InterpolateAxis(prevSnapshot.Rotations[clientId].x, nextSnapshot.Rotations[clientId].x, t);
-                rotation.y = InterpolateAxis(prevSnapshot.Rotations[clientId].y, nextSnapshot.Rotations[clientId].y, t);
-                rotation.z = InterpolateAxis(prevSnapshot.Rotations[clientId].z, nextSnapshot.Rotations[clientId].z, t);
+            rotation.w = InterpolateAxis(prevSnapshot.Rotations[playerId].w, nextSnapshot.Rotations[playerId].w, t);
+            rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
+            rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
+            rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
 
-                var clientTransform = clientCubePair.Value;
-                clientTransform.position = position;
-                clientTransform.rotation = rotation;
-            }
+            var playerTransform = playerTransformPair.Value;
+            playerTransform.position = position;
+            playerTransform.rotation = rotation;
         }
     }
 
@@ -231,7 +177,7 @@ public class ClientEntity : MonoBehaviour
         return currentSnapValue + (nextSnapValue - currentSnapValue) * t;
     }
     
-    public void Deserialize(BitBuffer buffer)
+    public void DeserializeBuffer(BitBuffer buffer)
     {
         PacketType messageType = (PacketType) buffer.GetByte();
 
@@ -242,27 +188,8 @@ public class ClientEntity : MonoBehaviour
                 break;
             case PacketType.CommandsAck:
             {
-                int receivedAckSequence = DeserializeAck(buffer);
-                Debug.Log("DELETING UP TO SEQ: " + receivedAckSequence);
-                foreach (var cmd in unAckedCommands)
-                {
-                    Debug.Log(cmd);
-                }
-                int lastAckedCommandsIndex = 0;
-                foreach (var commands in unAckedCommands)
-                {
-                    if (commands.Seq > receivedAckSequence)
-                    {
-                        break;
-                    }
-                    lastAckedCommandsIndex++;
-                }
-                unAckedCommands.RemoveRange(0, lastAckedCommandsIndex);
-                Debug.Log("AFTER DELETE UNACKED: " + unAckedCommands.Count);
-                foreach (var cmd in unAckedCommands)
-                {
-                    Debug.Log(cmd);
-                }
+                var receivedAckSequence = DeserializeAck(buffer);
+                RemoveAckedCommands(receivedAckSequence);
                 break;
             }
             case PacketType.PlayerJoined:
@@ -275,24 +202,23 @@ public class ClientEntity : MonoBehaviour
 
     private void DeserializeSnapshot(BitBuffer buffer)
     {
-        var seq = buffer.GetInt();
+        var recvFrameSeq = buffer.GetInt();
         
-        if (seq < displaySeq) return;
+        if (recvFrameSeq < displaySeq) return; // Check if received snapshot is old
         
         var time = buffer.GetFloat();
         var recvCmdSeq = buffer.GetInt();
-        var clientCount = buffer.GetByte();
+        var playerCount = buffer.GetByte();
 
-        Dictionary<int, Vector3> positions = new Dictionary<int, Vector3>();
-        Dictionary<int, Quaternion> rotations = new Dictionary<int, Quaternion>();
+        var positions = new Dictionary<int, Vector3>();
+        var rotations = new Dictionary<int, Quaternion>();
 
-        for (int i = 0; i < clientCount; i++)
+        for (int i = 0; i < playerCount; i++)
         {
-            var clientId = buffer.GetInt();
-            
             var position = new Vector3();
             var rotation = new Quaternion();
             
+            var playerId = buffer.GetInt();
             position.x = buffer.GetFloat();
             position.y = buffer.GetFloat();
             position.z = buffer.GetFloat();
@@ -301,58 +227,51 @@ public class ClientEntity : MonoBehaviour
             rotation.y = buffer.GetFloat();
             rotation.z = buffer.GetFloat();
             
-            positions.Add(clientId, position);
-            rotations.Add(clientId, rotation);
+            positions.Add(playerId, position);
+            rotations.Add(playerId, rotation);
 
-            if (clientId == userId)
-            {
-                //Debug.Log(position);
-                // Delete saved command sequences based on received sequence number
-                int toRemoveCmdIndex = 0;
-                foreach (var commands in predictionCommands)
-                {
-                    if (commands.Seq > recvCmdSeq) break;
-                    toRemoveCmdIndex++;
-                }
-                predictionCommands.RemoveRange(0, toRemoveCmdIndex);
-                
-                // Aplicarle a la posicion recibida todos los inputs faltantes y comparar con mi posicion
-                // Si es muy grande la diferencia cambiarla a esa
-                predictionCopy.transform.position = position;
-                Vector3 move = Vector3.zero;
-                foreach (var commands in predictionCommands)
-                {
-                    move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
-                    move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
-                }
-                predictionCopy.Move(move);
-                
-                // Check if received position differs much from predicted position
-                //Debug.Log(Vector3.Distance(transform.position, predictionCopy.transform.position));
-                if (Vector3.Distance(transform.position, predictionCopy.transform.position) > PredictionEpsilon)
-                {
-                    /*Debug.Log($"CORRECTION {Vector3.Distance(transform.position, predictionCopy.transform.position)} (" +
-                              $"{transform.position.x} {transform.position.y} {transform.position.z}) ({predictionCopy.transform.position.x} " +
-                              $"{predictionCopy.transform.position.y} {predictionCopy.transform.position.z})");*/
-                    
-                    transform.position = predictionCopy.transform.position;
-                    
-                    //Debug.Log($"NEW POSITION ({transform.position.x} {transform.position.y} {transform.position.z})");
-                }
-            }
+            if (playerId == clientId)
+                Conciliate(recvCmdSeq, position);
         }
-        
-        Snapshot snapshot = new Snapshot(seq, time, positions, rotations);
+
+        var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
+        StoreSnapshot(snapshot, recvFrameSeq);
+    }
+
+    private void StoreSnapshot(Snapshot snapshot, int recvFrameSeq)
+    {
         int bufferIndex;
         for (bufferIndex = 0; bufferIndex < interpolationBuffer.Count; bufferIndex++)
         {
-            if(interpolationBuffer[bufferIndex].Seq > seq)
+            if(interpolationBuffer[bufferIndex].Seq > recvFrameSeq)
                 break;
         }
         interpolationBuffer.Insert(bufferIndex, snapshot);
     }
-    
-    private void MovePlayer(/*float velocity,*/ List<Commands> commandsList)
+
+    private void Conciliate(int recvCmdSeq, Vector3 position)
+    {
+        // Delete saved command sequences based on received sequence number
+        int toRemoveCmdIndex = 0;
+        foreach (var commands in predictionCommands)
+        {
+            if (commands.Seq > recvCmdSeq) break;
+            toRemoveCmdIndex++;
+        }
+        predictionCommands.RemoveRange(0, toRemoveCmdIndex);
+                
+        // Conciliate local state with received snapshot data
+        transform.position = position;
+        Vector3 move = Vector3.zero;
+        foreach (var commands in predictionCommands)
+        {
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+        }
+        _characterController.Move(move);
+    }
+
+    private void MovePlayer(/*float velocity,*/ List<Commands> commandsList) // TODO ADD GRAVITY
     {
         Vector3 move = Vector3.zero;
         /*bool canJump = false;
@@ -371,8 +290,8 @@ public class ClientEntity : MonoBehaviour
         
         foreach (var commands in commandsList)
         {
-            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
-            move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
             
             /*if (commands.Space && _characterController.isGrounded && canJump)
             {
@@ -386,22 +305,40 @@ public class ClientEntity : MonoBehaviour
         _characterController.Move(move);
         //playerVelocitiesY[clientId] = velocity;
     }
-
-    public void SerializeCommands(BitBuffer buffer)
+    
+    // Serialize & send commands to server
+    private void SendCommands(List<Commands> commandsList)
     {
-        buffer.PutByte((int) PacketType.Commands);//buffer.PutInt((int) PacketType.Commands);
-        buffer.PutInt(userId);
+        var packet = Packet.Obtain();
+        SerializeCommands(packet.buffer, commandsList);
+        packet.buffer.Flush();
+
+        var serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
+        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+
+        packet.Free();
+    }
+
+    /*
+     * -- FORMAT --
+     * Packet Type (byte)
+     * Client ID (int)
+     * Commands Count (int)
+     * (Commands...)
+     */
+    public void SerializeCommands(BitBuffer buffer, List<Commands> commandsList)
+    {
+        buffer.PutByte((int) PacketType.Commands);
+        buffer.PutInt(clientId);
         buffer.PutInt(unAckedCommands.Count);
-        foreach (Commands commands in unAckedCommands)
+        foreach (Commands commands in commandsList)
         {
             buffer.PutInt(commands.Seq);
             buffer.PutInt(commands.Up ? 1 : 0);
             buffer.PutInt(commands.Down ? 1 : 0);
             buffer.PutInt(commands.Left ? 1 : 0);
             buffer.PutInt(commands.Right ? 1 : 0);
-            /*buffer.PutFloat(commands.Vertical);
-            buffer.PutFloat(commands.Horizontal);
-            buffer.PutInt(commands.Space ? 1 : 0);*/
         }
     }
     
@@ -410,10 +347,24 @@ public class ClientEntity : MonoBehaviour
         Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
         return buffer.GetInt();
     }
+
+    private void RemoveAckedCommands(int receivedAckSequence)
+    {
+        int lastAckedCommandsIndex = 0;
+        foreach (var commands in unAckedCommands)
+        {
+            if (commands.Seq > receivedAckSequence)
+            {
+                break;
+            }
+            lastAckedCommandsIndex++;
+        }
+        unAckedCommands.RemoveRange(0, lastAckedCommandsIndex);
+    }
     
     private void DeserializePlayerJoined(BitBuffer buffer)
     {
-        var clientId = buffer.GetInt();
+        var newPlayerId = buffer.GetInt();
             
         var position = new Vector3();
         var rotation = new Quaternion();
@@ -426,45 +377,51 @@ public class ClientEntity : MonoBehaviour
         rotation.y = buffer.GetFloat();
         rotation.z = buffer.GetFloat();
         
-        InitializeConnectedPlayer(clientId, position, rotation);
+        InitializeConnectedPlayer(newPlayerId, position, rotation);
         
-        SendPlayerJoinedAck(clientId);
-    }
-
-    private void OnDestroy() {
-        //sendChannel.Disconnect();
-        //recvChannel.Disconnect();
+        SendPlayerJoinedAck(newPlayerId);
     }
 
     public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
     {
-        GameObject newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
+        var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
         newClient.name = $"ClientCube-{connectedPlayerId}";
         newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
         newClient.GetComponent<Renderer>().material.color = clientColor;
         
-        otherClientCubes.Add(connectedPlayerId, newClient.transform);
+        otherPlayers.Add(connectedPlayerId, newClient.transform);
     }
     
-    private void SendPlayerJoinedAck(int clientId)
+    private void SendPlayerJoinedAck(int newPlayerId)
     {
         var packet = Packet.Obtain();
-        SerializePlayerJoinedAck(packet.buffer, clientId);
+        SerializePlayerJoinedAck(packet.buffer, newPlayerId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
 
         packet.Free();
     }
 
-    private void SerializePlayerJoinedAck(BitBuffer buffer, int clientId)
+    /*
+     * -- FORMAT --
+     * Packet Type (byte)
+     * Client ID (int)
+     * New Player ID (int)
+     */
+    private void SerializePlayerJoinedAck(BitBuffer buffer, int newPlayerId)
     {
         buffer.PutInt((int) PacketType.PlayerJoinedAck);
-        buffer.PutInt(userId);
         buffer.PutInt(clientId);
+        buffer.PutInt(newPlayerId);
+    }
+    
+    private void OnDestroy() {
+        //sendChannel.Disconnect();
+        //recvChannel.Disconnect();
     }
 }
