@@ -37,14 +37,14 @@ public class ServerEntity : MonoBehaviour
     public int pps = 60;
     private float sendRate;
     private float sendSnapshotAccum = 0;
-    private float serverTime = 0;
-    private int nextSnapshotSeq = 0; // Next snapshot to send
+    public float serverTime = 0;
+    public int nextSnapshotSeq = 0; // Next snapshot to send
     
     private bool serverConnected = true;
 
     private Color serverCubesColor = Color.white;
     private float floorSide = 4.5f; // Hardcoded
-    private float initY = 2f;//0.6f;
+    private float initY = 1.1f;//0.6f;
     
     private Dictionary<int, List<Commands>> recievedCommands = new Dictionary<int, List<Commands>>();
     //private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
@@ -161,8 +161,8 @@ public class ServerEntity : MonoBehaviour
         
         foreach (var commands in recievedCommands)
         {
-            move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
-            move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
             
             /*if (commands.Space && controller.isGrounded && canJump)
             {
@@ -295,6 +295,7 @@ public class ServerEntity : MonoBehaviour
         buffer.PutInt(fromClientPorts[newUserId]);
         buffer.PutInt(toClientPorts[newUserId]);
         buffer.PutFloat(serverTime);
+        buffer.PutInt(nextSnapshotSeq);
         buffer.PutByte(minInterpolationBufferElems);
         buffer.PutFloat(newClientPosition.x);
         buffer.PutFloat(newClientPosition.y);
@@ -363,17 +364,22 @@ public class ServerEntity : MonoBehaviour
         int playerId = buffer.GetInt();
         int storedCommandLists = buffer.GetInt();
         int seq = 0;
+        Debug.Log("STORED CMDS: " + storedCommandLists);
         for(int i = 0; i < storedCommandLists; i++)
         {
             seq = buffer.GetInt();
             
             Commands commands = new Commands(
                 seq,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0,
+                buffer.GetInt() > 0
+                /*buffer.GetFloat(),
                 buffer.GetFloat(),
-                buffer.GetFloat(),
-                buffer.GetInt() > 0);
+                buffer.GetInt() > 0*/);
             
-            if(playerRecvCmdSeq[playerId] > seq)
+            if(playerRecvCmdSeq[playerId] < seq)
                 commandsList.Add(commands);
         }
 
@@ -384,6 +390,11 @@ public class ServerEntity : MonoBehaviour
     
     private void ProcessReceivedInput(List<Commands> commandsList, int clientId)
     {
+        Debug.Log("SERVER - RECV COMMANDS:");
+        foreach (Commands commands in commandsList)
+        {
+            Debug.Log(commands);
+        }
         int receivedCommandSequence = -1;
         foreach (Commands commands in commandsList)
         {
@@ -391,6 +402,7 @@ public class ServerEntity : MonoBehaviour
             recievedCommands[clientId].Add(commands);
             //ExecuteClientInput(clientCubes[clientId], commands);
         }
+        Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
         
         var packet = Packet.Obtain();
         SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);

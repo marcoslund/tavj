@@ -22,7 +22,6 @@ public class ClientEntity : MonoBehaviour
     public List<Commands> unAckedCommands = new List<Commands>();
     public int minInterpolationBufferElems;
 
-    private int commandSeq = 1;
     private List<Commands> predictionCommands = new List<Commands>();
     private const float PredictionEpsilon = 0.1f;
     private CharacterController predictionCopy;
@@ -38,8 +37,10 @@ public class ClientEntity : MonoBehaviour
     public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;
     public float gravityValue = -9.81f;
+    
+    private Commands commandsToSend = new Commands();
 
-    public void Initialize(int sendPort, int recvPort, int userId, float time, int minInterpolationBufferElems,
+    public void Initialize(int sendPort, int recvPort, int userId, float time, int seq, int minInterpolationBufferElems,
         Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, GameObject predictionCopy,
         ClientManager clientManager)
     {
@@ -49,6 +50,7 @@ public class ClientEntity : MonoBehaviour
         //recvChannel = new Channel(recvPort);
         this.userId = userId;
         this.time = time;
+        displaySeq = seq;
         this.minInterpolationBufferElems = minInterpolationBufferElems;
         this.clientColor = clientColor;
         
@@ -68,6 +70,30 @@ public class ClientEntity : MonoBehaviour
         predictionCopy.transform.position = position;
         predictionCopy.transform.rotation = rotation;
         Physics.IgnoreCollision(_characterController, this.predictionCopy);
+    }
+
+    private void FixedUpdate()
+    {
+        if (commandsToSend.hasCommand())
+        {
+            MovePlayer(new List<Commands>() {commandsToSend});
+            unAckedCommands.Add(new Commands(commandsToSend));
+            predictionCommands.Add(new Commands(commandsToSend));
+            // Serialize & send commands to server
+            var packet = Packet.Obtain();
+            SerializeCommands(packet.buffer);
+            Debug.Log("CLIENT - SENDING " + unAckedCommands.Count + " COMMANDS TO SERVER, UP TO SEQ " + (commandsToSend.Seq));
+            packet.buffer.Flush();
+
+            string serverIP = "127.0.0.1";
+            var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
+            clientManager.serverEntity.fromClientChannels[userId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+
+            packet.Free();
+
+            commandsToSend.Seq++;
+            //commandsToSend.Reset();
+        }
     }
 
     private void Update()
@@ -111,7 +137,27 @@ public class ClientEntity : MonoBehaviour
 
     private void ReadClientInput()
     {
-        Commands currentCommands = new Commands(
+        if (Input.GetKeyDown(KeyCode.UpArrow))
+            commandsToSend.Up = true;
+        else if (Input.GetKeyUp(KeyCode.UpArrow))
+            commandsToSend.Up = false;
+        
+        if (Input.GetKeyDown(KeyCode.DownArrow))
+            commandsToSend.Down = true;
+        else if (Input.GetKeyUp(KeyCode.DownArrow))
+            commandsToSend.Down = false;
+        
+        if (Input.GetKeyDown(KeyCode.LeftArrow))
+            commandsToSend.Left = true;
+        else if (Input.GetKeyUp(KeyCode.LeftArrow))
+            commandsToSend.Left = false;
+        
+        if (Input.GetKeyDown(KeyCode.RightArrow))
+            commandsToSend.Right = true;
+        else if (Input.GetKeyUp(KeyCode.RightArrow))
+            commandsToSend.Right = false;
+        
+        /*Commands currentCommands = new Commands(
             commandSeq,
             Input.GetAxisRaw("Vertical"),
             Input.GetAxisRaw("Horizontal"),
@@ -135,7 +181,7 @@ public class ClientEntity : MonoBehaviour
             packet.Free();
             
             commandSeq++;
-        }
+        }*/
     }
     
     private void Interpolate(Snapshot prevSnapshot, Snapshot nextSnapshot, float t)
@@ -197,6 +243,11 @@ public class ClientEntity : MonoBehaviour
             case PacketType.CommandsAck:
             {
                 int receivedAckSequence = DeserializeAck(buffer);
+                Debug.Log("DELETING UP TO SEQ: " + receivedAckSequence);
+                foreach (var cmd in unAckedCommands)
+                {
+                    Debug.Log(cmd);
+                }
                 int lastAckedCommandsIndex = 0;
                 foreach (var commands in unAckedCommands)
                 {
@@ -207,6 +258,11 @@ public class ClientEntity : MonoBehaviour
                     lastAckedCommandsIndex++;
                 }
                 unAckedCommands.RemoveRange(0, lastAckedCommandsIndex);
+                Debug.Log("AFTER DELETE UNACKED: " + unAckedCommands.Count);
+                foreach (var cmd in unAckedCommands)
+                {
+                    Debug.Log(cmd);
+                }
                 break;
             }
             case PacketType.PlayerJoined:
@@ -250,6 +306,7 @@ public class ClientEntity : MonoBehaviour
 
             if (clientId == userId)
             {
+                //Debug.Log(position);
                 // Delete saved command sequences based on received sequence number
                 int toRemoveCmdIndex = 0;
                 foreach (var commands in predictionCommands)
@@ -265,8 +322,8 @@ public class ClientEntity : MonoBehaviour
                 Vector3 move = Vector3.zero;
                 foreach (var commands in predictionCommands)
                 {
-                    move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
-                    move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
+                    move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
+                    move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
                 }
                 predictionCopy.Move(move);
                 
@@ -314,8 +371,8 @@ public class ClientEntity : MonoBehaviour
         
         foreach (var commands in commandsList)
         {
-            move.x += commands.Horizontal * Time.fixedDeltaTime * playerSpeed;
-            move.z += commands.Vertical * Time.fixedDeltaTime * playerSpeed;
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
             
             /*if (commands.Space && _characterController.isGrounded && canJump)
             {
@@ -338,18 +395,19 @@ public class ClientEntity : MonoBehaviour
         foreach (Commands commands in unAckedCommands)
         {
             buffer.PutInt(commands.Seq);
-            /*buffer.PutInt(commands.Up ? 1 : 0);
+            buffer.PutInt(commands.Up ? 1 : 0);
             buffer.PutInt(commands.Down ? 1 : 0);
+            buffer.PutInt(commands.Left ? 1 : 0);
             buffer.PutInt(commands.Right ? 1 : 0);
-            buffer.PutInt(commands.Left ? 1 : 0);*/
-            buffer.PutFloat(commands.Vertical);
+            /*buffer.PutFloat(commands.Vertical);
             buffer.PutFloat(commands.Horizontal);
-            buffer.PutInt(commands.Space ? 1 : 0);
+            buffer.PutInt(commands.Space ? 1 : 0);*/
         }
     }
     
     private int DeserializeAck(BitBuffer buffer)
     {
+        Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
         return buffer.GetInt();
     }
     

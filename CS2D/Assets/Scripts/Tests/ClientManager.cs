@@ -108,6 +108,7 @@ public class ClientManager : MonoBehaviour
                 int sendPort = buffer.GetInt();
                 int recvPort = buffer.GetInt();
                 float time = buffer.GetFloat();
+                int seq = buffer.GetInt();
                 int minBufferElems = buffer.GetByte();
                 var position = new Vector3();
                 var rotation = new Quaternion();
@@ -129,7 +130,7 @@ public class ClientManager : MonoBehaviour
                 GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
                 predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
                 
-                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, minBufferElems, clientColor, 
+                clientEntityComponent.Initialize(sendPort, recvPort, userId, time, seq, minBufferElems, clientColor, 
                     position, rotation, usedClientLayersCount, predictionCopy, this);
                 usedClientLayersCount++;
                 
