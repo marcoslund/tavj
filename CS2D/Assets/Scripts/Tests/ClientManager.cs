@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -14,144 +15,170 @@ public class ClientManager : MonoBehaviour
     public ServerEntity serverEntity;
 
     private int clientCounter = 0;
-    private Dictionary<int, float> clientConnectionsTimeouts;
-    public const float ClientConnectionTimeout = 1f;
+    private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>();
+    private const float ClientConnectionTimeout = 1f;
     
     public GameObject cubePrefab;
 
     public int maxClientCount = 10;
     private int usedClientLayersCount = 1;
     
+    private bool createdFirstPlayer;
+    [HideInInspector] public GameObject firstPlayer;
+    
     // Start is called before the first frame update
     void Start()
     {
         //sendChannel = new Channel(sendPort);
         //recvChannel = new Channel(recvPort);
-        
-        clientConnectionsTimeouts = new Dictionary<int, float>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.C))
+        // Listen for new connection requests
+        if (Input.GetKeyDown(KeyCode.C) && clientCounter < maxClientCount)
         {
-            // Connect to server to create new client entity
-            // Make packet, send to server with timeout,
-            // wait for response with userID and channel ports, and then instantiate cube (with associated color),
-            // which will recieve snapshots separately
-
-            if (clientCounter < maxClientCount)
-            {
-                int userId = Random.Range(0, int.MaxValue); // Collisions are unlikely for the time being
-                SendClientConnection(userId);
-                clientConnectionsTimeouts.Add(userId, ClientConnectionTimeout);
-                clientCounter++;
-            }
+            int clientId = Random.Range(0, int.MaxValue); // Collisions are unlikely
+            SendClientConnection(clientId);
+            clientConnectionsTimeouts.Add(clientId, ClientConnectionTimeout);
+            clientCounter++;
         }
 
+        // Listen for server packets
         var packet = serverEntity.sendChannel.GetPacket();//recvChannel.GetPacket();
         if (packet != null) {
             var buffer = packet.buffer;
-            Debug.Log("Recieved packet at client manager");
-            // Deserialize
             Deserialize(buffer);
         }
 
-        foreach (var clientConnectionPair in clientConnectionsTimeouts)
+        UpdateConnectionTimeouts();
+    }
+
+    private void UpdateConnectionTimeouts()
+    {
+        var keys = clientConnectionsTimeouts.Keys.ToList();
+        foreach (var clientId in keys)
         {
-            var remainingTime = clientConnectionPair.Value - Time.deltaTime;
+            var remainingTime = clientConnectionsTimeouts[clientId] - Time.deltaTime;
             // Check if timeout has been reached
             if (remainingTime <= 0)
             {
-                SendClientConnection(clientConnectionPair.Key);
-                clientConnectionsTimeouts[clientConnectionPair.Key] = ClientConnectionTimeout;
+                SendClientConnection(clientId);
+                clientConnectionsTimeouts[clientId] = ClientConnectionTimeout;
+            }
+            else
+            {
+                clientConnectionsTimeouts[clientId] = remainingTime;
             }
         }
     }
 
-    private void SendClientConnection(int userId)
+    private void SendClientConnection(int clientId)
     {
         var packet = Packet.Obtain();
-        SerializeClientConnection(packet.buffer, userId);
+        SerializeClientConnection(packet.buffer, clientId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
         serverEntity.recvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
-        Debug.Log("Sent connection request to server");
         packet.Free();
     }
     
-    public void SerializeClientConnection(BitBuffer buffer, int userId) {
+    /*
+     * -- FORMAT --
+     * Packet Type (byte)
+     * Client ID (int)
+     */
+    public void SerializeClientConnection(BitBuffer buffer, int clientId) {
         buffer.PutByte((int) PacketType.Join);
-        buffer.PutInt(userId);
+        buffer.PutInt(clientId);
     }
     
     private void Deserialize(BitBuffer buffer)
     {
         PacketType messageType = (PacketType) buffer.GetByte();
-        
-        if (messageType == PacketType.PlayerJoinedResponse)
-        {
-            int userId = buffer.GetInt();
-            if (clientConnectionsTimeouts.ContainsKey(userId))
-            {
-                clientConnectionsTimeouts.Remove(userId);
-                
-                GameObject newClient = Instantiate(cubePrefab, transform);
-                newClient.name = $"ClientCube-{userId}";
-                newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
-                
-                ClientEntity clientEntityComponent = newClient.AddComponent<ClientEntity>();
-                
-                int sendPort = buffer.GetInt();
-                int recvPort = buffer.GetInt();
-                float time = buffer.GetFloat();
-                int seq = buffer.GetInt();
-                int minBufferElems = buffer.GetByte();
-                var position = new Vector3();
-                var rotation = new Quaternion();
-                
-                position.x = buffer.GetFloat();
-                position.y = buffer.GetFloat();
-                position.z = buffer.GetFloat();
-                rotation.w = buffer.GetFloat();
-                rotation.x = buffer.GetFloat();
-                rotation.y = buffer.GetFloat();
-                rotation.z = buffer.GetFloat();
-                
-                Color clientColor = new Color(
-                    Random.Range(0f, 1f), 
-                    Random.Range(0f, 1f), 
-                    Random.Range(0f, 1f)
-                );
-                
-                //GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
-                //predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
-                
-                clientEntityComponent.InitializeClientEntity(sendPort, recvPort, userId, time, seq, minBufferElems, clientColor, 
-                    position, rotation, usedClientLayersCount, /*predictionCopy,*/ this);
-                usedClientLayersCount++;
-                
-                int connectedPlayerCount = buffer.GetByte();
-                for (int i = 0; i < connectedPlayerCount; i++)
-                {
-                    userId = buffer.GetInt();
-                    position = new Vector3();
-                    rotation = new Quaternion();
-                    
-                    position.x = buffer.GetFloat();
-                    position.y = buffer.GetFloat();
-                    position.z = buffer.GetFloat();
-                    rotation.w = buffer.GetFloat();
-                    rotation.x = buffer.GetFloat();
-                    rotation.y = buffer.GetFloat();
-                    rotation.z = buffer.GetFloat();
 
-                    clientEntityComponent.InitializeConnectedPlayer(userId, position, rotation);
-                }
+        switch (messageType)
+        {
+            case PacketType.PlayerJoinedResponse:
+            {
+                int clientId = buffer.GetInt();
+                if (clientConnectionsTimeouts.ContainsKey(clientId))
+                    InitializeClientEntity(buffer, clientId);
+                break;
             }
+        }
+    }
+
+    private void InitializeClientEntity(BitBuffer buffer, int clientId)
+    {
+        clientConnectionsTimeouts.Remove(clientId);
+                
+        var newClient = Instantiate(cubePrefab, transform);
+        newClient.name = $"Client-{clientId}";
+        newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
+    
+        var clientEntity = newClient.AddComponent<ClientEntity>();
+    
+        var sendPort = buffer.GetInt();
+        var recvPort = buffer.GetInt();
+        var clientTime = buffer.GetFloat();
+        var displaySeq = buffer.GetInt();
+        var minBufferElems = buffer.GetByte();
+        var position = new Vector3();
+        var rotation = new Quaternion();
+    
+        position.x = buffer.GetFloat();
+        position.y = buffer.GetFloat();
+        position.z = buffer.GetFloat();
+        rotation.w = buffer.GetFloat();
+        rotation.x = buffer.GetFloat();
+        rotation.y = buffer.GetFloat();
+        rotation.z = buffer.GetFloat();
+    
+        var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
+    
+        //GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
+        //predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
+    
+        clientEntity.InitializeClientEntity(sendPort, recvPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
+            position, rotation, usedClientLayersCount, /*predictionCopy,*/ this);
+        usedClientLayersCount++;
+
+        InitializeOtherPlayerCopies(buffer, clientId, clientEntity);
+
+        if (!createdFirstPlayer)
+        {
+            firstPlayer = clientEntity.gameObject;
+            firstPlayer.AddComponent<FirstPersonView>();
+            firstPlayer.AddComponent<ShootManager>();
+            createdFirstPlayer = true;
+        }
+    }
+
+    private void InitializeOtherPlayerCopies(BitBuffer buffer, int clientId, ClientEntity clientEntity)
+    {
+        int connectedPlayerCount = buffer.GetByte();
+        var position = new Vector3();
+        var rotation = new Quaternion();
+        
+        for (var i = 0; i < connectedPlayerCount; i++)
+        {
+            clientId = buffer.GetInt();
+            position = new Vector3();
+            rotation = new Quaternion();
+
+            position.x = buffer.GetFloat();
+            position.y = buffer.GetFloat();
+            position.z = buffer.GetFloat();
+            rotation.w = buffer.GetFloat();
+            rotation.x = buffer.GetFloat();
+            rotation.y = buffer.GetFloat();
+            rotation.z = buffer.GetFloat();
+
+            clientEntity.InitializeConnectedPlayer(clientId, position, rotation);
         }
     }
 }

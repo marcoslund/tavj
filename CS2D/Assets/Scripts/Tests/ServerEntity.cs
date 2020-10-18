@@ -14,23 +14,21 @@ public class ServerEntity : MonoBehaviour
 
     public GameObject cubePrefab;
 
-    //[SerializeField] private Rigidbody cubeRigidBody;
-
-    [SerializeField] private Dictionary<int, CharacterController> clientCubes = new Dictionary<int, CharacterController>();
+    [SerializeField] private Dictionary<int, CharacterController> clients = new Dictionary<int, CharacterController>();
     private Dictionary<int, int> toClientPorts = new Dictionary<int, int>();
     private Dictionary<int, int> fromClientPorts = new Dictionary<int, int>();
     public Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
     public Dictionary<int, Channel> fromClientChannels = new Dictionary<int, Channel>();
     
-    private Dictionary<int, Dictionary<int, float>> playerJoinedTimeouts = new Dictionary<int, Dictionary<int, float>>();
+    private readonly Dictionary<int, Dictionary<int, float>> playerJoinedTimeouts = new Dictionary<int, Dictionary<int, float>>();
     private const float PlayerJoinedTimeout = 1f;
 
-    public const int PortsPerClient = 2;
+    private const int PortsPerClient = 2;
     public int sendPort = 9001;
     public int recvPort = 9000;
     public Channel sendChannel;
     public Channel recvChannel;
-    private int clientBasePort = 9010;
+    private readonly int clientBasePort = 9010;
     public int clientCount = 0;
     public int minInterpolationBufferElems = 2;
     
@@ -42,18 +40,18 @@ public class ServerEntity : MonoBehaviour
     
     private bool serverConnected = true;
 
-    private Color serverCubesColor = Color.white;
-    private float floorSide = 4.5f; // Hardcoded
-    private float initY = 1.1f;//0.6f;
-    
-    private Dictionary<int, List<Commands>> recievedCommands = new Dictionary<int, List<Commands>>();
+    private readonly Color serverCubesColor = Color.white;
+    private const float FloorSide = 4.5f; // Hardcoded
+    private const float InitY = 1.1f; //0.6f;
+
+    private readonly Dictionary<int, List<Commands>> receivedCommands = new Dictionary<int, List<Commands>>();
     //private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
-    public float playerSpeed = 2.0f;
-    public float jumpHeight = 1.0f;
-    public float jumpSpeed = 10.0f;
+    private float playerSpeed = 5.0f;
+    /*public float jumpHeight = 1.0f;
+    public float jumpSpeed = 10.0f;*/
     public float gravityValue = -9.81f;
 
-    private Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
+    private readonly Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
     
     // Start is called before the first frame update
     void Awake() {
@@ -65,10 +63,10 @@ public class ServerEntity : MonoBehaviour
 
     // Update is called once per frame
     void Update() {
-        if (Input.GetKeyDown(KeyCode.D))
+        /*if (Input.GetKeyDown(KeyCode.D))
         {
             serverConnected = !serverConnected;
-        }
+        }*/
 
         sendSnapshotAccum += Time.deltaTime;
 
@@ -80,12 +78,12 @@ public class ServerEntity : MonoBehaviour
 
     private void FixedUpdate()
     {
-        foreach (var client in clientCubes)
+        foreach (var client in clients)
         {
             var clientId = client.Key;
             var controller = client.Value;
             //var velocity = playerVelocitiesY[clientId];
-            MovePlayer(clientId, controller, /*velocity,*/ recievedCommands[clientId]);
+            MovePlayer(clientId, controller, /*velocity,*/ receivedCommands[clientId]);
         }
     }
 
@@ -105,7 +103,7 @@ public class ServerEntity : MonoBehaviour
                 {
                     var timeoutClientId = timeoutPair.Key;
                     var connectedPlayerId = connectedClientPairs.Key;
-                    var connectedPlayerTransform = clientCubes[connectedPlayerId].transform;
+                    var connectedPlayerTransform = clients[connectedPlayerId].transform;
                     SendPlayerJoined(toClientPorts[timeoutClientId], toClientChannels[timeoutClientId],
                         connectedPlayerId, connectedPlayerTransform.position, connectedPlayerTransform.rotation);
                     playerJoinedTimeouts[connectedPlayerId][timeoutClientId] = PlayerJoinedTimeout;
@@ -113,7 +111,7 @@ public class ServerEntity : MonoBehaviour
             }
         }
 
-        foreach (var clientId in clientCubes.Keys)
+        foreach (var clientId in clients.Keys)
         {
             // Deserialize packets for each client
             var packet = fromClientChannels[clientId].GetPacket();
@@ -132,7 +130,7 @@ public class ServerEntity : MonoBehaviour
             //var packet = Packet.Obtain();
             //SerializationManager.ServerWorldSerialize(clientCubes, packet.buffer, nextSnapshotSeq, serverTime); TODO OPTIMIZE
             
-            foreach (var clientId in clientCubes.Keys)
+            foreach (var clientId in clients.Keys)
             {
                 SendSnapshotToClient(clientId/*, packet.buffer*/);
             }
@@ -142,7 +140,7 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private void MovePlayer(int clientId, CharacterController controller, /*float velocity,*/ List<Commands> recievedCommands)
+    private void MovePlayer(int clientId, CharacterController controller, /*float velocity,*/ List<Commands> receivedCommands)
     {
         Vector3 move = Vector3.zero;
         /*bool canJump = false;
@@ -159,7 +157,7 @@ public class ServerEntity : MonoBehaviour
             canJump = true;
         }*/
         
-        foreach (var commands in recievedCommands)
+        foreach (var commands in receivedCommands)
         {
             move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
             move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
@@ -175,7 +173,7 @@ public class ServerEntity : MonoBehaviour
         
         controller.Move(move);
         
-        recievedCommands.Clear();
+        receivedCommands.Clear();
         //playerVelocitiesY[clientId] = velocity;
     }
 
@@ -185,7 +183,7 @@ public class ServerEntity : MonoBehaviour
         
         //snapshotBuffer.CopyTo(packet.buffer, snapshotBuffer.GetCurrentBitCount() * ); TODO OPTIMIZE
         
-        SerializationManager.ServerWorldSerialize(packet.buffer, clientCubes, nextSnapshotSeq, serverTime, playerRecvCmdSeq[clientId]);
+        ServerWorldSerialize(packet.buffer, nextSnapshotSeq, playerRecvCmdSeq[clientId]);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -193,6 +191,31 @@ public class ServerEntity : MonoBehaviour
         toClientChannels[clientId].Send(packet, remoteEp);
 
         packet.Free();
+    }
+    
+    private void ServerWorldSerialize(BitBuffer buffer, int snapshotSeq, int recvCmdSeq) {
+        buffer.PutByte((int) PacketType.Snapshot);
+        buffer.PutInt(snapshotSeq);
+        buffer.PutFloat(serverTime);
+        buffer.PutInt(recvCmdSeq);
+        buffer.PutByte(clients.Count);
+
+        foreach (var client in clients)
+        {
+            var clientId = client.Key;
+            var clientTransform = client.Value.transform;
+            var position = clientTransform.position;
+            var rotation = clientTransform.rotation;
+            
+            buffer.PutInt(clientId);
+            buffer.PutFloat(position.x);
+            buffer.PutFloat(position.y);
+            buffer.PutFloat(position.z);
+            buffer.PutFloat(rotation.w);
+            buffer.PutFloat(rotation.x);
+            buffer.PutFloat(rotation.y);
+            buffer.PutFloat(rotation.z);
+        }
     }
 
     private void ListenForPlayerConnections()
@@ -208,7 +231,7 @@ public class ServerEntity : MonoBehaviour
         // Create cube game object
         CharacterController newClient = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
         newClient.GetComponent<Renderer>().material.color = serverCubesColor;
-        clientCubes.Add(newUserId, newClient);
+        clients.Add(newUserId, newClient);
 
         int clientSendPort = clientBasePort + clientCount * PortsPerClient;
         int clientRecvPort = clientBasePort + clientCount * PortsPerClient + 1;
@@ -217,16 +240,16 @@ public class ServerEntity : MonoBehaviour
         fromClientChannels.Add(newUserId, new Channel(clientSendPort));
         toClientChannels.Add(newUserId, new Channel(clientRecvPort));
             
-        float clientX = Random.Range(-floorSide, floorSide);
-        float clientZ = Random.Range(-floorSide, floorSide);
-        Vector3 clientPosition = new Vector3(clientX, initY, clientZ);
+        float clientX = Random.Range(-FloorSide, FloorSide);
+        float clientZ = Random.Range(-FloorSide, FloorSide);
+        Vector3 clientPosition = new Vector3(clientX, InitY, clientZ);
         Quaternion clientRotation = newClient.transform.rotation;
 
         newClient.transform.position = clientPosition;
         newClient.name = $"ServerCube-{newUserId}";
         newClient.gameObject.layer = LayerMask.NameToLayer("Server");
         
-        recievedCommands.Add(newUserId, new List<Commands>());
+        receivedCommands.Add(newUserId, new List<Commands>());
         //playerVelocitiesY.Add(newUserId, 0);
         
         playerRecvCmdSeq.Add(newUserId, 0);
@@ -305,7 +328,7 @@ public class ServerEntity : MonoBehaviour
         buffer.PutFloat(newClientRotation.y);
         buffer.PutFloat(newClientRotation.z);
         buffer.PutByte(clientCount - 1);
-        foreach (var clientCubePair in clientCubes)
+        foreach (var clientCubePair in clients)
         {
             var clientId = clientCubePair.Key;
             if (clientId != newUserId)
@@ -342,7 +365,7 @@ public class ServerEntity : MonoBehaviour
 
     private void DeserializeClientMessage(BitBuffer buffer, int clientId)
     {
-        PacketType messageType = (PacketType) buffer.GetByte();//(PacketType) buffer.GetInt();
+        PacketType messageType = (PacketType) buffer.GetByte();
         
         switch (messageType)
         {
@@ -371,10 +394,10 @@ public class ServerEntity : MonoBehaviour
             
             Commands commands = new Commands(
                 seq,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0,
-                buffer.GetInt() > 0
+                buffer.GetByte() > 0,
+                buffer.GetByte() > 0,
+                buffer.GetByte() > 0,
+                buffer.GetByte() > 0
                 /*buffer.GetFloat(),
                 buffer.GetFloat(),
                 buffer.GetInt() > 0*/);
@@ -399,13 +422,13 @@ public class ServerEntity : MonoBehaviour
         foreach (Commands commands in commandsList)
         {
             receivedCommandSequence = commands.Seq;
-            recievedCommands[clientId].Add(commands);
+            receivedCommands[clientId].Add(commands);
             //ExecuteClientInput(clientCubes[clientId], commands);
         }
         //Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
         
         var packet = Packet.Obtain();
-        SerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
+        ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -413,6 +436,12 @@ public class ServerEntity : MonoBehaviour
         toClientChannels[clientId].Send(packet, remoteEp);
 
         packet.Free();
+    }
+    
+    private void ServerSerializeCommandAck(BitBuffer buffer, int commandSequence)
+    {
+        buffer.PutByte((int) PacketType.CommandsAck);
+        buffer.PutInt(commandSequence);
     }
     
     private void DeserializePlayerJoinedAck(BitBuffer buffer)

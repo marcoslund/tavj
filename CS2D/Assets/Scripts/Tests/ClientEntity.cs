@@ -31,7 +31,8 @@ public class ClientEntity : MonoBehaviour
 
     private CharacterController _characterController;
     private int clientLayer;
-    public float walkingSpeed = 2.0f;
+    [HideInInspector] public float currentSpeed;
+    public float walkingSpeed = 5.0f;
     /*public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;
     public float gravityValue = -9.81f;*/
@@ -59,6 +60,8 @@ public class ClientEntity : MonoBehaviour
         _characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
         this.clientManager = clientManager;
+
+        currentSpeed = walkingSpeed;
 
         //this.predictionCopy = predictionCopy.GetComponent<CharacterController>();
         //predictionCopy.GetComponent<Renderer>().enabled = false;
@@ -95,7 +98,7 @@ public class ClientEntity : MonoBehaviour
             isPlaying = true;
         else if (interpolationBuffer.Count <= 1)
             isPlaying = false;
-        
+
         if (isPlaying)
         {
             clientTime += Time.deltaTime;
@@ -114,33 +117,31 @@ public class ClientEntity : MonoBehaviour
             interpolationBuffer.RemoveAt(0);
             displaySeq++;
             if (interpolationBuffer.Count < 2)
-            {
                 isPlaying = false;
-            }
         }
     }
 
     // Update 'commandsToSend' variable if new input is read
     private void ReadInput()
     {
-        if (Input.GetKeyDown(KeyCode.UpArrow))
+        if (Input.GetKeyDown(KeyCode.W))
             commandsToSend.Up = true;
-        else if (Input.GetKeyUp(KeyCode.UpArrow) || (commandsToSend.Up && !Input.GetKey(KeyCode.UpArrow))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.W) || (commandsToSend.Up && !Input.GetKey(KeyCode.W))) // TO DELETE SECOND CHECK
             commandsToSend.Up = false;
         
-        if (Input.GetKeyDown(KeyCode.DownArrow))
+        if (Input.GetKeyDown(KeyCode.S))
             commandsToSend.Down = true;
-        else if (Input.GetKeyUp(KeyCode.DownArrow) || (commandsToSend.Down && !Input.GetKey(KeyCode.DownArrow))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.S) || (commandsToSend.Down && !Input.GetKey(KeyCode.S))) // TO DELETE SECOND CHECK
             commandsToSend.Down = false;
         
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (Input.GetKeyDown(KeyCode.A))
             commandsToSend.Left = true;
-        else if (Input.GetKeyUp(KeyCode.LeftArrow) || (commandsToSend.Left && !Input.GetKey(KeyCode.LeftArrow))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.A) || (commandsToSend.Left && !Input.GetKey(KeyCode.A))) // TO DELETE SECOND CHECK
             commandsToSend.Left = false;
-        
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+
+        if (Input.GetKeyDown(KeyCode.D))
             commandsToSend.Right = true;
-        else if (Input.GetKeyUp(KeyCode.RightArrow) || (commandsToSend.Right && !Input.GetKey(KeyCode.RightArrow))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.D) || (commandsToSend.Right && !Input.GetKey(KeyCode.D))) // TO DELETE SECOND CHECK
             commandsToSend.Right = false;
     }
     
@@ -233,7 +234,7 @@ public class ClientEntity : MonoBehaviour
             if (playerId == clientId)
                 Conciliate(recvCmdSeq, position);
         }
-
+        
         var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
         StoreSnapshot(snapshot, recvFrameSeq);
     }
@@ -299,8 +300,8 @@ public class ClientEntity : MonoBehaviour
                 move.y += velocity * Time.fixedDeltaTime;
                 canJump = false;
             }*/
-            
         }
+        //Debug.Log(move+ " " + commandsToSend);
         
         _characterController.Move(move);
         //playerVelocitiesY[clientId] = velocity;
@@ -327,7 +328,7 @@ public class ClientEntity : MonoBehaviour
      * Commands Count (int)
      * (Commands...)
      */
-    public void SerializeCommands(BitBuffer buffer, List<Commands> commandsList)
+    private void SerializeCommands(BitBuffer buffer, List<Commands> commandsList)
     {
         buffer.PutByte((int) PacketType.Commands);
         buffer.PutInt(clientId);
@@ -335,16 +336,16 @@ public class ClientEntity : MonoBehaviour
         foreach (Commands commands in commandsList)
         {
             buffer.PutInt(commands.Seq);
-            buffer.PutInt(commands.Up ? 1 : 0);
-            buffer.PutInt(commands.Down ? 1 : 0);
-            buffer.PutInt(commands.Left ? 1 : 0);
-            buffer.PutInt(commands.Right ? 1 : 0);
+            buffer.PutByte(commands.Up ? 1 : 0);
+            buffer.PutByte(commands.Down ? 1 : 0);
+            buffer.PutByte(commands.Left ? 1 : 0);
+            buffer.PutByte(commands.Right ? 1 : 0);
         }
     }
     
     private int DeserializeAck(BitBuffer buffer)
     {
-        Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
+        //Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
         return buffer.GetInt();
     }
 
@@ -415,7 +416,7 @@ public class ClientEntity : MonoBehaviour
      */
     private void SerializePlayerJoinedAck(BitBuffer buffer, int newPlayerId)
     {
-        buffer.PutInt((int) PacketType.PlayerJoinedAck);
+        buffer.PutByte((int) PacketType.PlayerJoinedAck);
         buffer.PutInt(clientId);
         buffer.PutInt(newPlayerId);
     }
