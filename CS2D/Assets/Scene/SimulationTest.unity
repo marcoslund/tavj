@@ -16199,7 +16199,7 @@ MonoBehaviour:
   pps: 60
   serverTime: 0
   nextSnapshotSeq: 0
-  gravityValue: -9.81
+  InitY: 2
 --- !u!4 &803758058
 Transform:
   m_ObjectHideFlags: 0

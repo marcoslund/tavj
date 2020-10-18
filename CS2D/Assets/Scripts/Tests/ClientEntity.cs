@@ -34,8 +34,9 @@ public class ClientEntity : MonoBehaviour
     [HideInInspector] public float currentSpeed;
     public float walkingSpeed = 5.0f;
     /*public float jumpHeight = 1.0f;
-    public float jumpSpeed = 10.0f;
-    public float gravityValue = -9.81f;*/
+    public float jumpSpeed = 10.0f;*/
+    public float gravityValue = -9.81f;
+    private float velocityY;
     
     private ClientManager clientManager;
     private Channel channel;
@@ -81,6 +82,10 @@ public class ClientEntity : MonoBehaviour
             predictionCommands.Add(new Commands(commandsToSend));
             SendCommands(unAckedCommands);
             commandsToSend.Seq++;
+        }
+        else
+        {
+            ApplyGravity();
         }
     }
 
@@ -209,6 +214,7 @@ public class ClientEntity : MonoBehaviour
         
         var time = buffer.GetFloat();
         var recvCmdSeq = buffer.GetInt();
+        var recvVelY = buffer.GetFloat();
         var playerCount = buffer.GetByte();
 
         var positions = new Dictionary<int, Vector3>();
@@ -232,7 +238,7 @@ public class ClientEntity : MonoBehaviour
             rotations.Add(playerId, rotation);
 
             if (playerId == clientId)
-                Conciliate(recvCmdSeq, position);
+                Conciliate(recvCmdSeq, position, recvVelY);
         }
         
         var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
@@ -250,7 +256,7 @@ public class ClientEntity : MonoBehaviour
         interpolationBuffer.Insert(bufferIndex, snapshot);
     }
 
-    private void Conciliate(int recvCmdSeq, Vector3 position)
+    private void Conciliate(int recvCmdSeq, Vector3 position, float recvVelY)
     {
         // Delete saved command sequences based on received sequence number
         int toRemoveCmdIndex = 0;
@@ -266,28 +272,34 @@ public class ClientEntity : MonoBehaviour
         Vector3 move = Vector3.zero;
         foreach (var commands in predictionCommands)
         {
+            if (!_characterController.isGrounded)
+            {
+                recvVelY += gravityValue * Time.fixedDeltaTime;
+                move.y = velocityY * Time.fixedDeltaTime;
+            }
             move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
             move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
         }
         _characterController.Move(move);
+        velocityY = recvVelY;
     }
 
-    private void MovePlayer(/*float velocity,*/ List<Commands> commandsList) // TODO ADD GRAVITY
+    private void MovePlayer(List<Commands> commandsList)
     {
         Vector3 move = Vector3.zero;
-        /*bool canJump = false;
+        /*bool canJump = false;*/
         
         if (!_characterController.isGrounded)
         {
-            velocity += gravityValue * Time.fixedDeltaTime;
-            move.y = velocity * Time.fixedDeltaTime;
+            velocityY += gravityValue * Time.fixedDeltaTime;
+            move.y = velocityY * Time.fixedDeltaTime;
         }
         else
         {
-            velocity = gravityValue * Time.fixedDeltaTime;
+            velocityY = gravityValue * Time.fixedDeltaTime;
             move.y = gravityValue * Time.fixedDeltaTime;
-            canJump = true;
-        }*/
+            //canJump = true;
+        }
         
         foreach (var commands in commandsList)
         {
@@ -301,10 +313,26 @@ public class ClientEntity : MonoBehaviour
                 canJump = false;
             }*/
         }
-        //Debug.Log(move+ " " + commandsToSend);
         
         _characterController.Move(move);
-        //playerVelocitiesY[clientId] = velocity;
+    }
+    
+    private void ApplyGravity()
+    {
+        Vector3 move = Vector3.zero;
+        
+        if (!_characterController.isGrounded)
+        {
+            velocityY += gravityValue * Time.fixedDeltaTime;
+            move.y = velocityY * Time.fixedDeltaTime;
+        }
+        else
+        {
+            velocityY = gravityValue * Time.fixedDeltaTime;
+            move.y = gravityValue * Time.fixedDeltaTime;
+        }
+        
+        _characterController.Move(move);
     }
     
     // Serialize & send commands to server

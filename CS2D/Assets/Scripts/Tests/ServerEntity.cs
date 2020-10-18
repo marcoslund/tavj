@@ -42,14 +42,14 @@ public class ServerEntity : MonoBehaviour
 
     private readonly Color serverCubesColor = Color.white;
     private const float FloorSide = 4.5f; // Hardcoded
-    private const float InitY = 1.1f; //0.6f;
+    public float InitY = 1.1f; //0.6f;
 
     private readonly Dictionary<int, List<Commands>> receivedCommands = new Dictionary<int, List<Commands>>();
-    //private Dictionary<int, float> playerVelocitiesY = new Dictionary<int, float>();
+    private Dictionary<int, float> playersVelocitiesY = new Dictionary<int, float>();
     private float playerSpeed = 5.0f;
     /*public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;*/
-    public float gravityValue = -9.81f;
+    private float gravityValue = -9.81f;
 
     private readonly Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
     
@@ -82,8 +82,8 @@ public class ServerEntity : MonoBehaviour
         {
             var clientId = client.Key;
             var controller = client.Value;
-            //var velocity = playerVelocitiesY[clientId];
-            MovePlayer(clientId, controller, /*velocity,*/ receivedCommands[clientId]);
+            var velocity = playersVelocitiesY[clientId];
+            MovePlayer(clientId, controller, velocity, receivedCommands[clientId]);
         }
     }
 
@@ -140,10 +140,10 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private void MovePlayer(int clientId, CharacterController controller, /*float velocity,*/ List<Commands> receivedCommands)
+    private void MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> receivedCommands)
     {
         Vector3 move = Vector3.zero;
-        /*bool canJump = false;
+        /*bool canJump = false;*/
         
         if (!controller.isGrounded)
         {
@@ -154,8 +154,8 @@ public class ServerEntity : MonoBehaviour
         {
             velocity = gravityValue * Time.fixedDeltaTime;
             move.y = gravityValue * Time.fixedDeltaTime;
-            canJump = true;
-        }*/
+            //canJump = true;
+        }
         
         foreach (var commands in receivedCommands)
         {
@@ -174,7 +174,7 @@ public class ServerEntity : MonoBehaviour
         controller.Move(move);
         
         receivedCommands.Clear();
-        //playerVelocitiesY[clientId] = velocity;
+        playersVelocitiesY[clientId] = velocity;
     }
 
     private void SendSnapshotToClient(int clientId/*, BitBuffer snapshotBuffer*/)
@@ -183,7 +183,7 @@ public class ServerEntity : MonoBehaviour
         
         //snapshotBuffer.CopyTo(packet.buffer, snapshotBuffer.GetCurrentBitCount() * ); TODO OPTIMIZE
         
-        ServerWorldSerialize(packet.buffer, nextSnapshotSeq, playerRecvCmdSeq[clientId]);
+        ServerWorldSerialize(packet.buffer, nextSnapshotSeq, clientId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -193,16 +193,17 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
     
-    private void ServerWorldSerialize(BitBuffer buffer, int snapshotSeq, int recvCmdSeq) {
+    private void ServerWorldSerialize(BitBuffer buffer, int snapshotSeq, int clientId) {
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
-        buffer.PutInt(recvCmdSeq);
+        buffer.PutInt(playerRecvCmdSeq[clientId]);
+        buffer.PutFloat(playersVelocitiesY[clientId]);
         buffer.PutByte(clients.Count);
 
         foreach (var client in clients)
         {
-            var clientId = client.Key;
+            clientId = client.Key;
             var clientTransform = client.Value.transform;
             var position = clientTransform.position;
             var rotation = clientTransform.rotation;
@@ -250,7 +251,7 @@ public class ServerEntity : MonoBehaviour
         newClient.gameObject.layer = LayerMask.NameToLayer("Server");
         
         receivedCommands.Add(newUserId, new List<Commands>());
-        //playerVelocitiesY.Add(newUserId, 0);
+        playersVelocitiesY.Add(newUserId, 0);
         
         playerRecvCmdSeq.Add(newUserId, 0);
             
