@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using Tests;
 using UnityEngine;
@@ -168,10 +169,9 @@ public class ServerEntity : MonoBehaviour
                 move.y += velocity * Time.fixedDeltaTime;
                 canJump = false;
             }*/
-            
+            controller.transform.rotation = Quaternion.Euler(0, commands.RotationY, 0); // TODO MOVE FOR EVERY COMMAND, SO MIDDLE ROTATIONS AFFECT RESULT
         }
-        
-        controller.Move(move);
+        controller.Move(controller.transform.TransformDirection(move));
         
         receivedCommands.Clear();
         playersVelocitiesY[clientId] = velocity;
@@ -398,10 +398,8 @@ public class ServerEntity : MonoBehaviour
                 buffer.GetByte() > 0,
                 buffer.GetByte() > 0,
                 buffer.GetByte() > 0,
-                buffer.GetByte() > 0
-                /*buffer.GetFloat(),
-                buffer.GetFloat(),
-                buffer.GetInt() > 0*/);
+                buffer.GetByte() > 0,
+                buffer.GetFloat());
             
             if(playerRecvCmdSeq[playerId] < seq)
                 commandsList.Add(commands);

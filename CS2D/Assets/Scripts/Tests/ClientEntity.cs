@@ -75,6 +75,13 @@ public class ClientEntity : MonoBehaviour
 
     private void FixedUpdate()
     {
+        commandsToSend.RotationY = transform.rotation.eulerAngles.y;
+        MovePlayer(new List<Commands>() {commandsToSend});
+        unAckedCommands.Add(new Commands(commandsToSend));
+        predictionCommands.Add(new Commands(commandsToSend));
+        SendCommands(unAckedCommands);
+        commandsToSend.Seq++;
+        /*
         if (commandsToSend.hasCommand())
         {
             MovePlayer(new List<Commands>() {commandsToSend});
@@ -86,7 +93,7 @@ public class ClientEntity : MonoBehaviour
         else
         {
             ApplyGravity();
-        }
+        }*/
     }
 
     private void Update()
@@ -238,7 +245,7 @@ public class ClientEntity : MonoBehaviour
             rotations.Add(playerId, rotation);
 
             if (playerId == clientId)
-                Conciliate(recvCmdSeq, position, recvVelY);
+                ;//Conciliate(recvCmdSeq, position, recvVelY); TODO ASK ABOUT ROTATION
         }
         
         var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
@@ -280,7 +287,7 @@ public class ClientEntity : MonoBehaviour
             move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
             move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
         }
-        _characterController.Move(move);
+        //_characterController.Move(move);
         velocityY = recvVelY;
     }
 
@@ -313,8 +320,7 @@ public class ClientEntity : MonoBehaviour
                 canJump = false;
             }*/
         }
-        
-        _characterController.Move(move);
+        _characterController.Move(transform.TransformDirection(move));
     }
     
     private void ApplyGravity()
@@ -356,7 +362,7 @@ public class ClientEntity : MonoBehaviour
      * Commands Count (int)
      * (Commands...)
      */
-    private void SerializeCommands(BitBuffer buffer, List<Commands> commandsList)
+    private void SerializeCommands(BitBuffer buffer, List<Commands> commandsList) // TODO SEND ROTATION
     {
         buffer.PutByte((int) PacketType.Commands);
         buffer.PutInt(clientId);
@@ -368,6 +374,7 @@ public class ClientEntity : MonoBehaviour
             buffer.PutByte(commands.Down ? 1 : 0);
             buffer.PutByte(commands.Left ? 1 : 0);
             buffer.PutByte(commands.Right ? 1 : 0);
+            buffer.PutFloat(commands.RotationY);
         }
     }
     

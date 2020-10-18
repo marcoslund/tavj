@@ -12,8 +12,9 @@ namespace Tests
         private bool down;
         private bool left;
         private bool right;
+        private float rotationY;
 
-        public Commands(int seq, bool up, bool down, bool left, bool right/*float vertical, float horizontal, bool space*/)
+        public Commands(int seq, bool up, bool down, bool left, bool right, float rotationY)
         {
             this.seq = seq;
             /*this.vertical = vertical;
@@ -23,6 +24,7 @@ namespace Tests
             this.down = down;
             this.left = left;
             this.right = right;
+            this.rotationY = rotationY;
         }
 
         public Commands(Commands other)
@@ -32,6 +34,7 @@ namespace Tests
             down = other.Down;
             left = other.Left;
             right = other.Right;
+            rotationY = other.rotationY;
         }
 
         public Commands()
@@ -89,20 +92,15 @@ namespace Tests
             set => right = value;
         }
 
-        /*public float Vertical => vertical;
-        
-        public float Horizontal => horizontal;
-
-        public bool Space => space;
-        
-        public override string ToString()
+        public float RotationY
         {
-            return $"{nameof(Seq)}: {Seq}, {nameof(Horizontal)}: {Horizontal}, {nameof(Vertical)}: {Vertical}, {nameof(Space)}: {Space}";
-        }*/
+            get => rotationY;
+            set => rotationY = value;
+        }
 
         public override string ToString()
         {
-            return $"{nameof(seq)}: {seq}, {nameof(up)}: {up}, {nameof(down)}: {down}, {nameof(left)}: {left}, {nameof(right)}: {right}";
+            return $"{nameof(seq)}: {seq}, {nameof(up)}: {up}, {nameof(down)}: {down}, {nameof(left)}: {left}, {nameof(right)}: {right}, {nameof(rotationY)}: {rotationY}";
         }
     }
 }
