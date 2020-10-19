@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,6 +53,8 @@ public class ServerEntity : MonoBehaviour
     private float gravityValue = -9.81f;
 
     private readonly Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
+
+    public bool capsulesOn = true;
     
     // Start is called before the first frame update
     void Awake() {
@@ -143,25 +145,28 @@ public class ServerEntity : MonoBehaviour
 
     private void MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> receivedCommands)
     {
-        Vector3 move = Vector3.zero;
-        /*bool canJump = false;*/
-        
-        if (!controller.isGrounded)
-        {
-            velocity += gravityValue * Time.fixedDeltaTime;
-            move.y = velocity * Time.fixedDeltaTime;
-        }
-        else
-        {
-            velocity = gravityValue * Time.fixedDeltaTime;
-            move.y = gravityValue * Time.fixedDeltaTime;
-            //canJump = true;
-        }
+        var ctrlTransform = controller.transform;
         
         foreach (var commands in receivedCommands)
         {
-            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
-            move.z += commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
+            Vector3 move = Vector3.zero;
+            /*bool canJump = false;*/
+            move.x = commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
+            move.z = commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
+            ctrlTransform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
+            move = ctrlTransform.TransformDirection(move);
+            
+            if (!controller.isGrounded)
+            {
+                velocity += gravityValue * Time.fixedDeltaTime;
+                move.y = velocity * Time.fixedDeltaTime;
+            }
+            else
+            {
+                velocity = gravityValue * Time.fixedDeltaTime;
+                move.y = gravityValue * Time.fixedDeltaTime;
+                //canJump = true;
+            }
             
             /*if (commands.Space && controller.isGrounded && canJump)
             {
@@ -169,9 +174,9 @@ public class ServerEntity : MonoBehaviour
                 move.y += velocity * Time.fixedDeltaTime;
                 canJump = false;
             }*/
-            controller.transform.rotation = Quaternion.Euler(0, commands.RotationY, 0); // TODO MOVE FOR EVERY COMMAND, SO MIDDLE ROTATIONS AFFECT RESULT
+            
+            controller.Move(move);
         }
-        controller.Move(controller.transform.TransformDirection(move));
         
         receivedCommands.Clear();
         playersVelocitiesY[clientId] = velocity;
@@ -232,6 +237,7 @@ public class ServerEntity : MonoBehaviour
         // Create cube game object
         CharacterController newClient = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
         newClient.GetComponent<Renderer>().material.color = serverCubesColor;
+        if (!capsulesOn) newClient.GetComponent<Renderer>().enabled = false;
         clients.Add(newUserId, newClient);
 
         int clientSendPort = clientBasePort + clientCount * PortsPerClient;

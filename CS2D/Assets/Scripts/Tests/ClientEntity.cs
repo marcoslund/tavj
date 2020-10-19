@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -76,15 +76,15 @@ public class ClientEntity : MonoBehaviour
     private void FixedUpdate()
     {
         commandsToSend.RotationY = transform.rotation.eulerAngles.y;
-        MovePlayer(new List<Commands>() {commandsToSend});
+        MovePlayer(commandsToSend);
         unAckedCommands.Add(new Commands(commandsToSend));
         predictionCommands.Add(new Commands(commandsToSend));
         SendCommands(unAckedCommands);
         commandsToSend.Seq++;
-        /*
-        if (commandsToSend.hasCommand())
+        
+        /*if (commandsToSend.hasCommand())
         {
-            MovePlayer(new List<Commands>() {commandsToSend});
+            MovePlayer(commandsToSend);
             unAckedCommands.Add(new Commands(commandsToSend));
             predictionCommands.Add(new Commands(commandsToSend));
             SendCommands(unAckedCommands);
@@ -275,26 +275,36 @@ public class ClientEntity : MonoBehaviour
         predictionCommands.RemoveRange(0, toRemoveCmdIndex);
                 
         // Conciliate local state with received snapshot data
+        var currentRotationY = transform.rotation.eulerAngles.y;
         transform.position = position;
-        Vector3 move = Vector3.zero;
         foreach (var commands in predictionCommands)
         {
+            Vector3 move = Vector3.zero;
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+            transform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
+            move = transform.TransformDirection(move);
+            
             if (!_characterController.isGrounded)
             {
                 recvVelY += gravityValue * Time.fixedDeltaTime;
                 move.y = velocityY * Time.fixedDeltaTime;
             }
-            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
-            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+            
+            _characterController.Move(move);
         }
-        //_characterController.Move(move);
         velocityY = recvVelY;
+        transform.rotation = Quaternion.Euler(0, currentRotationY, 0);
     }
 
-    private void MovePlayer(List<Commands> commandsList)
+    private void MovePlayer(Commands commands)
     {
         Vector3 move = Vector3.zero;
         /*bool canJump = false;*/
+        
+        move.x = commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
+        move.z = commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+        move = transform.TransformDirection(move);
         
         if (!_characterController.isGrounded)
         {
@@ -308,19 +318,14 @@ public class ClientEntity : MonoBehaviour
             //canJump = true;
         }
         
-        foreach (var commands in commandsList)
+        /*if (commands.Space && _characterController.isGrounded && canJump)
         {
-            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
-            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
-            
-            /*if (commands.Space && _characterController.isGrounded && canJump)
-            {
-                velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
-                move.y += velocity * Time.fixedDeltaTime;
-                canJump = false;
-            }*/
-        }
-        _characterController.Move(transform.TransformDirection(move));
+            velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
+            move.y += velocity * Time.fixedDeltaTime;
+            canJump = false;
+        }*/
+        
+        _characterController.Move(move);
     }
     
     private void ApplyGravity()

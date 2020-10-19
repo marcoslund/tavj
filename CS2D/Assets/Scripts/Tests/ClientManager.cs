@@ -119,6 +119,7 @@ public class ClientManager : MonoBehaviour
         var newClient = Instantiate(cubePrefab, transform);
         newClient.name = $"Client-{clientId}";
         newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
+        if (!serverEntity.capsulesOn) newClient.GetComponent<Renderer>().enabled = false;
     
         var clientEntity = newClient.AddComponent<ClientEntity>();
     
