@@ -119,10 +119,11 @@ public class ServerEntity : MonoBehaviour
             // Deserialize packets for each client
             var packet = fromClientChannels[clientId].GetPacket();
             
-            if (packet != null) {
+            while (packet != null) {
                 var buffer = packet.buffer;
 
                 DeserializeClientMessage(buffer, clientId);
+                packet = fromClientChannels[clientId].GetPacket();
             }
         }
         

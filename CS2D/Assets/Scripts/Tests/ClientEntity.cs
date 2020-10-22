@@ -100,9 +100,10 @@ public class ClientEntity : MonoBehaviour
     {
         // Check for incoming packets
         var packet = channel.GetPacket();//recvChannel.GetPacket();
-        if (packet != null) {
+        while (packet != null) {
             var buffer = packet.buffer;
             DeserializeBuffer(buffer);
+            packet = channel.GetPacket();
         }
         
         // Check if stored snapshot count is valid
@@ -245,7 +246,7 @@ public class ClientEntity : MonoBehaviour
             rotations.Add(playerId, rotation);
 
             if (playerId == clientId)
-                ;//Conciliate(recvCmdSeq, position, recvVelY); TODO ASK ABOUT ROTATION
+                Conciliate(recvCmdSeq, position, recvVelY);
         }
         
         var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
@@ -328,7 +329,7 @@ public class ClientEntity : MonoBehaviour
         _characterController.Move(move);
     }
     
-    private void ApplyGravity()
+    /*private void ApplyGravity()
     {
         Vector3 move = Vector3.zero;
         
@@ -344,7 +345,7 @@ public class ClientEntity : MonoBehaviour
         }
         
         _characterController.Move(move);
-    }
+    }*/
     
     // Serialize & send commands to server
     private void SendCommands(List<Commands> commandsList)
