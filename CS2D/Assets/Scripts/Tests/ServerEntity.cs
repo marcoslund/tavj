@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,8 +53,15 @@ public class ServerEntity : MonoBehaviour
     private float gravityValue = -9.81f;
 
     private readonly Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
+    private readonly Dictionary<int, int> playerRecvShotSeq = new Dictionary<int, int>();
+    
+    private readonly Dictionary<int, int> playersHealth = new Dictionary<int, int>();
+    public const int FullPlayerHealth = 100;
+    public const int ShotDamage = 15;
 
     public bool capsulesOn = true;
+
+    public ClientManager clientManager; // TODO DELETE
     
     // Start is called before the first frame update
     void Awake() {
@@ -203,6 +210,7 @@ public class ServerEntity : MonoBehaviour
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
+        buffer.PutInt(playersHealth[clientId]);
         buffer.PutInt(playerRecvCmdSeq[clientId]);
         buffer.PutFloat(playersVelocitiesY[clientId]);
         buffer.PutByte(clients.Count);
@@ -261,6 +269,8 @@ public class ServerEntity : MonoBehaviour
         playersVelocitiesY.Add(newUserId, 0);
         
         playerRecvCmdSeq.Add(newUserId, 0);
+        playerRecvShotSeq.Add(newUserId, 0);
+        playersHealth.Add(newUserId, FullPlayerHealth);
             
         clientCount++;
 
@@ -335,6 +345,7 @@ public class ServerEntity : MonoBehaviour
         buffer.PutFloat(newClientRotation.x);
         buffer.PutFloat(newClientRotation.y);
         buffer.PutFloat(newClientRotation.z);
+        buffer.PutInt(FullPlayerHealth);
         buffer.PutByte(clientCount - 1);
         foreach (var clientCubePair in clients)
         {
@@ -379,10 +390,14 @@ public class ServerEntity : MonoBehaviour
         {
             case PacketType.Commands:
                 List<Commands> commandsList = DeserializeCommands(buffer);
-                ProcessReceivedInput(commandsList, clientId);
+                ProcessReceivedCommands(commandsList, clientId);
                 break;
             case PacketType.PlayerJoinedAck:
                 DeserializePlayerJoinedAck(buffer);
+                break;
+            case PacketType.PlayerShot:
+                List<Shot> shotsList = DeserializePlayerShot(buffer);
+                ProcessReceivedShots(shotsList, clientId);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -407,32 +422,33 @@ public class ServerEntity : MonoBehaviour
                 buffer.GetByte() > 0,
                 buffer.GetByte() > 0,
                 buffer.GetFloat());
-            
-            if(playerRecvCmdSeq[playerId] < seq)
-                commandsList.Add(commands);
-        }
 
-        playerRecvCmdSeq[playerId] = seq;
+            if (playerRecvCmdSeq[playerId] < seq)
+            {
+                commandsList.Add(commands);
+                playerRecvCmdSeq[playerId] = seq;
+            }
+            if (clientManager.ERROR)
+                ;
+        }
+        //Debug.Log("RECV " + storedCommandLists + " COMMANDS AT SERVER UP TO " + seq);
 
         return commandsList;
     }
     
-    private void ProcessReceivedInput(List<Commands> commandsList, int clientId)
+    private void ProcessReceivedCommands(List<Commands> commandsList, int clientId)
     {
-        /*Debug.Log("SERVER - RECV COMMANDS:");*/
-        /*foreach (Commands commands in commandsList)
-        {
-            Debug.Log(commands);
-        }*/
         int receivedCommandSequence = -1;
         foreach (Commands commands in commandsList)
         {
             receivedCommandSequence = commands.Seq;
+            
             receivedCommands[clientId].Add(commands);
             //ExecuteClientInput(clientCubes[clientId], commands);
         }
         //Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
-        
+        if (clientManager.ERROR)
+            ;
         var packet = Packet.Obtain();
         ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
         packet.buffer.Flush();
@@ -446,6 +462,9 @@ public class ServerEntity : MonoBehaviour
     
     private void ServerSerializeCommandAck(BitBuffer buffer, int commandSequence)
     {
+        //Debug.Log("SENDING ACK FROM SERVER: " + commandSequence);
+        if (clientManager.ERROR)
+            ;
         buffer.PutByte((int) PacketType.CommandsAck);
         buffer.PutInt(commandSequence);
     }
@@ -459,5 +478,61 @@ public class ServerEntity : MonoBehaviour
         {
             playerJoinedTimeouts.Remove(connectedPlayerId);
         }
+    }
+    
+    private List<Shot> DeserializePlayerShot(BitBuffer buffer)
+    {
+        List<Shot> shotsList = new List<Shot>();
+        int playerId = buffer.GetInt();
+        int storedShots = buffer.GetInt();
+        int seq = 0;
+        
+        for(int i = 0; i < storedShots; i++)
+        {
+            seq = buffer.GetInt();
+            
+            Shot shot = new Shot(
+                seq,
+                buffer.GetInt()
+            );
+
+            if (playerRecvShotSeq[playerId] < seq)
+            {
+                shotsList.Add(shot);
+                playerRecvShotSeq[playerId] = seq;
+            }
+        }
+
+        return shotsList;
+    }
+    
+    private void ProcessReceivedShots(List<Shot> shotsList, int shooterId)
+    {
+        int recvdShotSequence = -1;
+        foreach (Shot shot in shotsList)
+        {
+            recvdShotSequence = shot.Seq;
+
+            playersHealth[shot.ShotPlayerId] -= ShotDamage;
+            // CHECK IF DEAD...
+        }
+        
+        // ENVIAR AVISO AL RESTO
+        
+        var packet = Packet.Obtain();
+        ServerSerializeShotAck(packet.buffer, recvdShotSequence);
+        packet.buffer.Flush();
+
+        string serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[shooterId]);
+        toClientChannels[shooterId].Send(packet, remoteEp);
+
+        packet.Free();
+    }
+
+    private void ServerSerializeShotAck(BitBuffer buffer, int shotSequence)
+    {
+        buffer.PutByte((int) PacketType.PlayerShotAck);
+        buffer.PutInt(shotSequence);
     }
 }

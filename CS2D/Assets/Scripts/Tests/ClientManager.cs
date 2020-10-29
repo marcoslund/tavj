@@ -25,6 +25,8 @@ public class ClientManager : MonoBehaviour
     
     private bool createdFirstPlayer;
     [HideInInspector] public GameObject firstPlayer;
+
+    public bool ERROR = false; // TODO DELETE
     
     // Start is called before the first frame update
     void Start()
@@ -138,6 +140,8 @@ public class ClientManager : MonoBehaviour
         rotation.x = buffer.GetFloat();
         rotation.y = buffer.GetFloat();
         rotation.z = buffer.GetFloat();
+
+        var health = buffer.GetInt();
     
         var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
     
@@ -145,7 +149,7 @@ public class ClientManager : MonoBehaviour
         //predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
     
         clientEntity.InitializeClientEntity(sendPort, recvPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
-            position, rotation, usedClientLayersCount, /*predictionCopy,*/ this);
+            position, rotation, health, usedClientLayersCount, /*predictionCopy,*/ this);
         usedClientLayersCount++;
 
         InitializeOtherPlayerCopies(buffer, clientId, clientEntity);

@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class GunManager : MonoBehaviour
 {
@@ -96,6 +98,10 @@ public class GunManager : MonoBehaviour
 	public float secondCameraZoomRatio_notAiming = 60;
 	public float secondCameraZoomRatio_aiming = 40;
 	[HideInInspector] public float gunPrecision;
+
+	public LayerMask layerMask;
+	public float shotMaxDistance = 1000000;
+	RaycastHit shotRaycastHit;
 	
 	[Header("Animation names")]
 	public string aimingAnimationName = "Player_AImpose";
@@ -125,8 +131,12 @@ public class GunManager : MonoBehaviour
 		rotationLastX= firstPersonView.currentCameraXRotation;
 	}
 
-	private void Update() {
+	private void Start()
+	{
+		layerMask = LayerMask.GetMask(LayerMask.LayerToName(transform.gameObject.layer));
+	}
 
+	private void Update() {
 		Animations();
 		PositionGun();
 		Shoot();
@@ -159,12 +169,19 @@ public class GunManager : MonoBehaviour
 	private void Shoot() {
 		if (Input.GetButton ("Fire1") && waitTillNextFire <= 0) {
 			int randomNumberForMuzzelFlash = Random.Range(0,5);
-			Instantiate(bullet, bulletSpawn.transform.position, bulletSpawn.transform.rotation);
+
+			if (Physics.Raycast(transform.position, transform.forward, out shotRaycastHit, shotMaxDistance,
+				layerMask))
+			{
+				Debug.DrawLine(transform.position, shotRaycastHit.point);
+				clientEntity.SendPlayerShotMessage(shotRaycastHit.transform.name);
+			}
+			
 			holdFlash = Instantiate(muzzelFlash[randomNumberForMuzzelFlash], muzzelSpawn.transform.position, 
 				muzzelSpawn.transform.rotation * Quaternion.Euler(0,0,90) );
 			holdFlash.transform.parent = muzzelSpawn.transform;
 			
-			shootSoundSource.Play();
+			//shootSoundSource.Play();
 			RecoilMath();
 			waitTillNextFire = 1;
 		}

@@ -30,7 +30,8 @@ public class ShootManager : MonoBehaviour
             weaponChanging.Play ();
         
         var resource = (GameObject) Resources.Load("Gun");
-        gun = (GameObject) Instantiate(resource, transform.position, Quaternion.identity, transform);
+        gun = Instantiate(resource, transform.position, Quaternion.identity, transform);
+        gun.layer = transform.gameObject.layer;
         handsAnimator = gun.GetComponent<GunManager>().handsAnimator;
     }
     

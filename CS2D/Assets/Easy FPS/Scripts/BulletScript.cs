@@ -22,7 +22,7 @@ public class BulletScript : MonoBehaviour {
 	*/
 	void Update () {
 
-		if(Physics.Raycast(transform.position, transform.forward,out hit, maxDistance, ~ignoreLayer)){
+		if(Physics.Raycast(transform.position, transform.forward, out hit, maxDistance, ~ignoreLayer)){
 			if(decalHitWall){
 				if(hit.transform.tag == "LevelPart"){
 					Instantiate(decalHitWall, hit.point + hit.normal * floatInfrontOfWall, Quaternion.LookRotation(hit.normal));

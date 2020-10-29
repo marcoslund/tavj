@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,12 +37,16 @@ public class ClientEntity : MonoBehaviour
     public float jumpSpeed = 10.0f;*/
     public float gravityValue = -9.81f;
     private float velocityY;
+
+    private int shotSeq = 1;
+    public List<Shot> unAckedShots = new List<Shot>();
+    public int health;
     
     private ClientManager clientManager;
     private Channel channel;
 
     public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
-        int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int clientLayer, 
+        int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
         /*GameObject predictionCopy,*/ ClientManager clientManager)
     {
         this.sendPort = sendPort;
@@ -58,6 +62,7 @@ public class ClientEntity : MonoBehaviour
         rend.material.color = clientColor;
         transform.position = position;
         transform.rotation = rotation;
+        this.health = health;
         _characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
         this.clientManager = clientManager;
@@ -204,10 +209,18 @@ public class ClientEntity : MonoBehaviour
             {
                 var receivedAckSequence = DeserializeAck(buffer);
                 RemoveAckedCommands(receivedAckSequence);
+                //Debug.Log("RECV ACK " + receivedAckSequence +  " - UNACKED COMMANDS " + unAckedCommands.Count);
+                if (unAckedCommands.Count > 15)
+                {
+                    clientManager.ERROR = true;
+                }
                 break;
             }
             case PacketType.PlayerJoined:
                 DeserializePlayerJoined(buffer);
+                break;
+            case PacketType.PlayerShotAck:
+                // REMOVE FROM ACCUM SHOT LIST LIKE COMMANDS
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -221,6 +234,7 @@ public class ClientEntity : MonoBehaviour
         if (recvFrameSeq < displaySeq) return; // Check if received snapshot is old
         
         var time = buffer.GetFloat();
+        health = buffer.GetInt();
         var recvCmdSeq = buffer.GetInt();
         var recvVelY = buffer.GetFloat();
         var playerCount = buffer.GetByte();
@@ -382,6 +396,7 @@ public class ClientEntity : MonoBehaviour
             buffer.PutByte(commands.Right ? 1 : 0);
             buffer.PutFloat(commands.RotationY);
         }
+        //Debug.Log("SENDING COMMANDS TO SERVER UP TO " + commandsToSend.Seq);
     }
     
     private int DeserializeAck(BitBuffer buffer)
@@ -427,7 +442,7 @@ public class ClientEntity : MonoBehaviour
     public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
     {
         var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
-        newClient.name = $"ClientCube-{connectedPlayerId}";
+        newClient.name = $"{connectedPlayerId}";
         newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
@@ -465,5 +480,41 @@ public class ClientEntity : MonoBehaviour
     private void OnDestroy() {
         //sendChannel.Disconnect();
         //recvChannel.Disconnect();
+    }
+
+    public void SendPlayerShotMessage(string shotPlayerIdStr)
+    {
+        var shotPlayerId = Int32.Parse(shotPlayerIdStr);
+        unAckedShots.Add(new Shot(shotSeq, shotPlayerId));
+        shotSeq++;
+        
+        var packet = Packet.Obtain();
+        SerializePlayerShot(packet.buffer);
+        packet.buffer.Flush();
+
+        string serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
+        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
+
+        packet.Free();
+    }
+
+    /*
+     * -- FORMAT --
+     * Packet Type (byte)
+     * Client ID (int)
+     * Shots Count (int)
+     * (Shots...)
+     */
+    private void SerializePlayerShot(BitBuffer buffer)
+    {
+        buffer.PutByte((int) PacketType.PlayerShot);
+        buffer.PutInt(clientId);
+        buffer.PutInt(unAckedShots.Count);
+        foreach (Shot shot in unAckedShots)
+        {
+            buffer.PutInt(shot.Seq);
+            buffer.PutInt(shot.ShotPlayerId);
+        }
     }
 }
