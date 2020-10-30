@@ -42,7 +42,7 @@ namespace Tests
             seq = 1;
         }
 
-        public bool hasCommand()
+        public bool isMoveCommand()
         {
             return up || down || left || right; //(vertical != 0f) || (horizontal != 0f) || space;
         }

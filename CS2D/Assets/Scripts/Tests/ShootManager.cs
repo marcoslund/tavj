@@ -9,7 +9,7 @@ public class ShootManager : MonoBehaviour
     [HideInInspector] public Transform raySpawn;
     
     public GameObject gun;
-    private Animator handsAnimator;
+    [HideInInspector] public Animator handsAnimator;
     public Texture icon;
     
     public AudioSource weaponChanging;

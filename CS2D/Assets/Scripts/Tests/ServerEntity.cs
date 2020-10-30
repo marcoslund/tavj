@@ -59,7 +59,7 @@ public class ServerEntity : MonoBehaviour
     public const int FullPlayerHealth = 100;
     public const int ShotDamage = 15;
 
-    public bool capsulesOn = true;
+    public bool capsulesOn = false;
 
     public ClientManager clientManager; // TODO DELETE
     
@@ -515,9 +515,16 @@ public class ServerEntity : MonoBehaviour
 
             playersHealth[shot.ShotPlayerId] -= ShotDamage;
             // CHECK IF DEAD...
+            
+            foreach (var clientChannelPair in toClientChannels)
+            {
+                var clientId = clientChannelPair.Key;
+                if (clientId != shooterId)
+                {
+                    SendPlayerShotBroadcast(toClientPorts[clientId], toClientChannels[clientId], shooterId, shot.ShotPlayerId);
+                }
+            }
         }
-        
-        // ENVIAR AVISO AL RESTO
         
         var packet = Packet.Obtain();
         ServerSerializeShotAck(packet.buffer, recvdShotSequence);
@@ -534,5 +541,25 @@ public class ServerEntity : MonoBehaviour
     {
         buffer.PutByte((int) PacketType.PlayerShotAck);
         buffer.PutInt(shotSequence);
+    }
+    
+    private void SendPlayerShotBroadcast(int port, Channel channel, int shooterId, int shotPlayerId)
+    {
+        var packet = Packet.Obtain();
+        SerializePlayerShotBroadcast(packet.buffer, shooterId, shotPlayerId);
+        packet.buffer.Flush();
+
+        string serverIP = "127.0.0.1";
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), port);
+        channel.Send(packet, remoteEp);
+
+        packet.Free();
+    }
+
+    private void SerializePlayerShotBroadcast(BitBuffer buffer, int shooterId, int shotPlayerId)
+    {
+        buffer.PutByte((int) PacketType.PlayerShotBroadcast);
+        buffer.PutInt(shooterId);
+        buffer.PutInt(shotPlayerId);
     }
 }

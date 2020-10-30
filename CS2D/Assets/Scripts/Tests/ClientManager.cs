@@ -158,7 +158,7 @@ public class ClientManager : MonoBehaviour
         {
             firstPlayer = clientEntity.gameObject;
             firstPlayer.AddComponent<FirstPersonView>();
-            firstPlayer.AddComponent<ShootManager>();
+            //firstPlayer.AddComponent<ShootManager>();
             createdFirstPlayer = true;
         }
     }

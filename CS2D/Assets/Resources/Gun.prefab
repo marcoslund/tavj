@@ -1410,7 +1410,7 @@ Animator:
   m_GameObject: {fileID: 143294}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 6cae2f82a0a62ff4ab9be3eeeda19688, type: 3}
-  m_Controller: {fileID: 9100000, guid: 511f24fd060ef465da64edde8c05d690, type: 2}
+  m_Controller: {fileID: 9100000, guid: 93cff1371e3ca8b4c9199d63648a040b, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -2280,7 +2280,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   firstPersonView: {fileID: 0}
-  shootManager: {fileID: 0}
   mainCamera: {fileID: 0}
   bulletSpawn: {fileID: 0}
   bullet: {fileID: 128516, guid: 9b23a7cb44ba8af488216f863cd64f28, type: 3}
@@ -2292,8 +2291,7 @@ MonoBehaviour:
   restPlacePosition: {x: -0.07, y: -0.06, z: 0.42}
   aimPlacePosition: {x: 0, y: -0.03, z: 0.3}
   gunAimTime: 0.05
-  handsAnimator: {fileID: 95000012490115852, guid: 13c46916fa552fb4e846d566e8b3a073,
-    type: 3}
+  handsAnimator: {fileID: 9561740}
   muzzelFlash:
   - {fileID: 199458, guid: 51b76f616384d4946bed4ecc9a6c2c3e, type: 3}
   - {fileID: 199458, guid: 487eef9aff9d0f543836d5af5ab26430, type: 3}

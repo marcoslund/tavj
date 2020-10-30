@@ -7,7 +7,7 @@ using Random = UnityEngine.Random;
 public class GunManager : MonoBehaviour
 {
     [HideInInspector] public FirstPersonView firstPersonView;
-    [HideInInspector] public ShootManager shootManager;
+    //[HideInInspector] public ShootManager shootManager;
 
 	private Transform player;
 	private Transform gunPlaceHolder;
@@ -114,7 +114,7 @@ public class GunManager : MonoBehaviour
 	{
 		player = GameObject.FindWithTag("ClientController").GetComponent<ClientManager>().firstPlayer.transform;
 		firstPersonView = player.GetComponent<FirstPersonView>();
-		shootManager = player.GetComponent<ShootManager>();
+		//shootManager = player.GetComponent<ShootManager>();
 		mainCamera = firstPersonView.myCamera;
 		mainCameraComponent = mainCamera.GetComponent<Camera>();
 		secondCameraComponent = GameObject.FindGameObjectWithTag("SecondCamera").GetComponent<Camera>();
@@ -148,8 +148,8 @@ public class GunManager : MonoBehaviour
 	{
 		if (!handsAnimator) return;
 
-		handsAnimator.SetFloat("walkSpeed", clientEntity.currentSpeed);
-		handsAnimator.SetBool("aiming", Input.GetButton("Fire2"));
+		//handsAnimator.SetFloat("walkSpeed", clientEntity.currentSpeed);
+		handsAnimator.SetBool("Aiming", Input.GetButton("Fire2"));
 	}
 	
 	private void PositionGun() {
@@ -159,7 +159,7 @@ public class GunManager : MonoBehaviour
 			(mainCamera.up * (currentGunPosition.y+ currentRecoilYPos)) + 
 			(mainCamera.forward * (currentGunPosition.z + currentRecoilZPos)),ref velV, 0);
 		
-		shootManager.cameraPosition = new Vector3(currentRecoilXPos, currentRecoilYPos, 0);
+		clientEntity.cameraPosition = new Vector3(currentRecoilXPos, currentRecoilYPos, 0); // shootManager...
 
 		currentRecoilZPos = Mathf.SmoothDamp(currentRecoilZPos, 0, ref velocity_z_recoil, recoilOverTime_z);
 		currentRecoilXPos = Mathf.SmoothDamp(currentRecoilXPos, 0, ref velocity_x_recoil, recoilOverTime_x);
@@ -175,6 +175,7 @@ public class GunManager : MonoBehaviour
 			{
 				Debug.DrawLine(transform.position, shotRaycastHit.point);
 				clientEntity.SendPlayerShotMessage(shotRaycastHit.transform.name);
+				// TODO Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
 			}
 			
 			holdFlash = Instantiate(muzzelFlash[randomNumberForMuzzelFlash], muzzelSpawn.transform.position, 
@@ -283,7 +284,7 @@ public class GunManager : MonoBehaviour
 	}*/
 
 	private void OnGUI() {
-		DrawCrosshair();
+		//DrawCrosshair();
 	}
 
 	private void DrawCrosshair() {

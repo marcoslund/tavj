@@ -44,6 +44,16 @@ public class ClientEntity : MonoBehaviour
     
     private ClientManager clientManager;
     private Channel channel;
+    
+    [HideInInspector] public Transform cameraMain;
+    [HideInInspector] public Vector3 cameraPosition;
+    [HideInInspector] public Transform raySpawn;
+    
+    public GameObject gun;
+    public Animator handsAnimator;
+    public Texture icon;
+    
+    public AudioSource weaponChanging;
 
     public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
         int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
@@ -76,12 +86,31 @@ public class ClientEntity : MonoBehaviour
         //Physics.IgnoreCollision(_characterController, this.predictionCopy);
 
         channel = clientManager.serverEntity.toClientChannels[clientId]; // TO DELETE
+        
+        cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
+        raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
+        icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
+        
+        StartCoroutine ("SpawnWeaponUponStart");
+    }
+    
+    private IEnumerator SpawnWeaponUponStart() {
+        yield return new WaitForSeconds (0.5f);
+        if (weaponChanging)
+            weaponChanging.Play ();
+        
+        var resource = (GameObject) Resources.Load("Gun");
+        gun = Instantiate(resource, transform.position, Quaternion.identity, transform);
+        gun.layer = transform.gameObject.layer;
+        handsAnimator = gun.GetComponent<GunManager>().handsAnimator;
     }
 
     private void FixedUpdate()
     {
         commandsToSend.RotationY = transform.rotation.eulerAngles.y;
-        MovePlayer(commandsToSend);
+        var move = MovePlayer(commandsToSend);
+        if (handsAnimator)
+            handsAnimator.SetBool("Moving", commandsToSend.isMoveCommand());
         unAckedCommands.Add(new Commands(commandsToSend));
         predictionCommands.Add(new Commands(commandsToSend));
         SendCommands(unAckedCommands);
@@ -207,7 +236,7 @@ public class ClientEntity : MonoBehaviour
                 break;
             case PacketType.CommandsAck:
             {
-                var receivedAckSequence = DeserializeAck(buffer);
+                var receivedAckSequence = DeserializeCommandAck(buffer);
                 RemoveAckedCommands(receivedAckSequence);
                 //Debug.Log("RECV ACK " + receivedAckSequence +  " - UNACKED COMMANDS " + unAckedCommands.Count);
                 if (unAckedCommands.Count > 15)
@@ -220,7 +249,11 @@ public class ClientEntity : MonoBehaviour
                 DeserializePlayerJoined(buffer);
                 break;
             case PacketType.PlayerShotAck:
-                // REMOVE FROM ACCUM SHOT LIST LIKE COMMANDS
+                var rcvdShotSequence = DeserializeShotAck(buffer);
+                RemoveAckedShots(rcvdShotSequence);
+                break;
+            case PacketType.PlayerShotBroadcast:
+                // TODO SHOW SHOOTING ANIMATION & BLOOD
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -312,7 +345,7 @@ public class ClientEntity : MonoBehaviour
         transform.rotation = Quaternion.Euler(0, currentRotationY, 0);
     }
 
-    private void MovePlayer(Commands commands)
+    private Vector3 MovePlayer(Commands commands)
     {
         Vector3 move = Vector3.zero;
         /*bool canJump = false;*/
@@ -341,6 +374,8 @@ public class ClientEntity : MonoBehaviour
         }*/
         
         _characterController.Move(move);
+
+        return move;
     }
     
     /*private void ApplyGravity()
@@ -399,7 +434,7 @@ public class ClientEntity : MonoBehaviour
         //Debug.Log("SENDING COMMANDS TO SERVER UP TO " + commandsToSend.Seq);
     }
     
-    private int DeserializeAck(BitBuffer buffer)
+    private int DeserializeCommandAck(BitBuffer buffer)
     {
         //Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
         return buffer.GetInt();
@@ -511,10 +546,27 @@ public class ClientEntity : MonoBehaviour
         buffer.PutByte((int) PacketType.PlayerShot);
         buffer.PutInt(clientId);
         buffer.PutInt(unAckedShots.Count);
-        foreach (Shot shot in unAckedShots)
+        foreach (var shot in unAckedShots)
         {
             buffer.PutInt(shot.Seq);
             buffer.PutInt(shot.ShotPlayerId);
         }
+    }
+    
+    private int DeserializeShotAck(BitBuffer buffer)
+    {
+        return buffer.GetInt();
+    }
+
+    private void RemoveAckedShots(int rcvdShotSequence)
+    {
+        int lastAckedShotIndex = 0;
+        foreach (var shot in unAckedShots)
+        {
+            if (shot.Seq > rcvdShotSequence)
+                break;
+            lastAckedShotIndex++;
+        }
+        unAckedShots.RemoveRange(0, lastAckedShotIndex);
     }
 }
