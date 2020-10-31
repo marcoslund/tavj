@@ -85,7 +85,7 @@ public class ClientEntity : MonoBehaviour
         //predictionCopy.transform.rotation = rotation;
         //Physics.IgnoreCollision(_characterController, this.predictionCopy);
 
-        channel = clientManager.serverEntity.toClientChannels[clientId]; // TO DELETE
+        channel = clientManager.serverEntity.clients[clientId].SendChannel; // TO DELETE
         
         cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
         raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
@@ -238,11 +238,6 @@ public class ClientEntity : MonoBehaviour
             {
                 var receivedAckSequence = DeserializeCommandAck(buffer);
                 RemoveAckedCommands(receivedAckSequence);
-                //Debug.Log("RECV ACK " + receivedAckSequence +  " - UNACKED COMMANDS " + unAckedCommands.Count);
-                if (unAckedCommands.Count > 15)
-                {
-                    clientManager.ERROR = true;
-                }
                 break;
             }
             case PacketType.PlayerJoined:
@@ -253,7 +248,7 @@ public class ClientEntity : MonoBehaviour
                 RemoveAckedShots(rcvdShotSequence);
                 break;
             case PacketType.PlayerShotBroadcast:
-                // TODO SHOW SHOOTING ANIMATION & BLOOD
+                // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -405,7 +400,7 @@ public class ClientEntity : MonoBehaviour
 
         var serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
 
         packet.Free();
     }
@@ -494,7 +489,7 @@ public class ClientEntity : MonoBehaviour
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
+        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
 
         packet.Free();
     }
@@ -529,7 +524,7 @@ public class ClientEntity : MonoBehaviour
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.fromClientChannels[clientId].Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
+        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
 
         packet.Free();
     }

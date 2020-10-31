@@ -14,16 +14,9 @@ public class ServerEntity : MonoBehaviour
 {
 
     public GameObject cubePrefab;
-
-    [SerializeField] private Dictionary<int, CharacterController> clients = new Dictionary<int, CharacterController>();
-    private Dictionary<int, int> toClientPorts = new Dictionary<int, int>();
-    private Dictionary<int, int> fromClientPorts = new Dictionary<int, int>();
-    public Dictionary<int, Channel> toClientChannels = new Dictionary<int, Channel>();
-    public Dictionary<int, Channel> fromClientChannels = new Dictionary<int, Channel>();
     
-    private readonly Dictionary<int, Dictionary<int, float>> playerJoinedTimeouts = new Dictionary<int, Dictionary<int, float>>();
-    private const float PlayerJoinedTimeout = 1f;
-
+    [HideInInspector] public Dictionary<int, ClientData> clients = new Dictionary<int, ClientData>();
+    
     private const int PortsPerClient = 2;
     public int sendPort = 9001;
     public int recvPort = 9000;
@@ -31,6 +24,7 @@ public class ServerEntity : MonoBehaviour
     public Channel recvChannel;
     private readonly int clientBasePort = 9010;
     public int clientCount = 0;
+    private const float PlayerJoinedTimeout = 1f;
     public int minInterpolationBufferElems = 2;
     
     public int pps = 60;
@@ -45,17 +39,11 @@ public class ServerEntity : MonoBehaviour
     private const float FloorSide = 4.5f; // Hardcoded
     public float InitY = 1.1f; //0.6f;
 
-    private readonly Dictionary<int, List<Commands>> receivedCommands = new Dictionary<int, List<Commands>>();
-    private Dictionary<int, float> playersVelocitiesY = new Dictionary<int, float>();
     private float playerSpeed = 5.0f;
     /*public float jumpHeight = 1.0f;
     public float jumpSpeed = 10.0f;*/
     private float gravityValue = -9.81f;
-
-    private readonly Dictionary<int, int> playerRecvCmdSeq = new Dictionary<int, int>();
-    private readonly Dictionary<int, int> playerRecvShotSeq = new Dictionary<int, int>();
     
-    private readonly Dictionary<int, int> playersHealth = new Dictionary<int, int>();
     public const int FullPlayerHealth = 100;
     public const int ShotDamage = 15;
 
@@ -64,7 +52,7 @@ public class ServerEntity : MonoBehaviour
     public ClientManager clientManager; // TODO DELETE
     
     // Start is called before the first frame update
-    void Awake() {
+    private void Awake() {
         sendChannel = new Channel(sendPort);
         recvChannel = new Channel(recvPort);
         
@@ -72,7 +60,7 @@ public class ServerEntity : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update() {
+    private void Update() {
         /*if (Input.GetKeyDown(KeyCode.D))
         {
             serverConnected = !serverConnected;
@@ -91,9 +79,8 @@ public class ServerEntity : MonoBehaviour
         foreach (var client in clients)
         {
             var clientId = client.Key;
-            var controller = client.Value;
-            var velocity = playersVelocitiesY[clientId];
-            MovePlayer(clientId, controller, velocity, receivedCommands[clientId]);
+            var clientData = client.Value;
+            MovePlayer(clientId, clientData.Controller, clientData.YVelocity, clientData.RecvCommands);
         }
     }
 
@@ -102,52 +89,52 @@ public class ServerEntity : MonoBehaviour
         serverTime += Time.deltaTime;
 
         ListenForPlayerConnections();
+        UpdatePlayerJoinedTimeouts();
         
-        foreach (var connectedClientPairs in playerJoinedTimeouts)
+        foreach (var clientDataPair in clients) // Listen for incoming packets
         {
-            foreach (var timeoutPair in connectedClientPairs.Value)
-            {
-                var remainingTime = timeoutPair.Value - Time.deltaTime;
-                // Check if timeout has been reached
-                if (remainingTime <= 0)
-                {
-                    var timeoutClientId = timeoutPair.Key;
-                    var connectedPlayerId = connectedClientPairs.Key;
-                    var connectedPlayerTransform = clients[connectedPlayerId].transform;
-                    SendPlayerJoined(toClientPorts[timeoutClientId], toClientChannels[timeoutClientId],
-                        connectedPlayerId, connectedPlayerTransform.position, connectedPlayerTransform.rotation);
-                    playerJoinedTimeouts[connectedPlayerId][timeoutClientId] = PlayerJoinedTimeout;
-                }
-            }
-        }
-
-        foreach (var clientId in clients.Keys)
-        {
+            var clientId = clientDataPair.Key;
+            var clientData = clientDataPair.Value;
+            
             // Deserialize packets for each client
-            var packet = fromClientChannels[clientId].GetPacket();
+            var packet = clientData.RecvChannel.GetPacket();
             
             while (packet != null) {
                 var buffer = packet.buffer;
-
                 DeserializeClientMessage(buffer, clientId);
-                packet = fromClientChannels[clientId].GetPacket();
+                packet = clientData.RecvChannel.GetPacket();
             }
         }
         
-        if (sendSnapshotAccum >= sendRate)
+        if (sendSnapshotAccum >= sendRate) // Check if snapshot must be sent
         {
-            // Serialize & send snapshot to each client
-            
-            //var packet = Packet.Obtain();
-            //SerializationManager.ServerWorldSerialize(clientCubes, packet.buffer, nextSnapshotSeq, serverTime); TODO OPTIMIZE
-            
             foreach (var clientId in clients.Keys)
             {
-                SendSnapshotToClient(clientId/*, packet.buffer*/);
+                SendSnapshotToClient(clientId);
             }
-
             sendSnapshotAccum -= sendRate;
             nextSnapshotSeq++;
+        }
+    }
+
+    private void UpdatePlayerJoinedTimeouts()
+    {
+        foreach (var clientDataPair in clients)
+        {
+            var connectedPlayerId = clientDataPair.Key;
+            var clientData = clientDataPair.Value;
+            foreach (var timeoutPair in clientData.PlayerJoinedTimeouts)
+            {
+                var remainingTime = timeoutPair.Value - Time.deltaTime;
+                if (remainingTime <= 0) // Check if timeout has been reached
+                {
+                    var timeoutClientId = timeoutPair.Key;
+                    var timeoutClientData = clients[timeoutClientId];
+                    SendPlayerJoined(timeoutClientData.SendPort, timeoutClientData.SendChannel, connectedPlayerId, 
+                        clientData.Controller.transform);
+                    clientData.PlayerJoinedTimeouts[timeoutClientId] = PlayerJoinedTimeout;
+                }
+            }
         }
     }
 
@@ -187,38 +174,39 @@ public class ServerEntity : MonoBehaviour
         }
         
         receivedCommands.Clear();
-        playersVelocitiesY[clientId] = velocity;
+        clients[clientId].YVelocity = velocity;
     }
 
-    private void SendSnapshotToClient(int clientId/*, BitBuffer snapshotBuffer*/)
+    private void SendSnapshotToClient(int clientId)
     {
         var packet = Packet.Obtain();
-        
-        //snapshotBuffer.CopyTo(packet.buffer, snapshotBuffer.GetCurrentBitCount() * ); TODO OPTIMIZE
         
         ServerWorldSerialize(packet.buffer, nextSnapshotSeq, clientId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[clientId]);
-        toClientChannels[clientId].Send(packet, remoteEp);
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), clients[clientId].SendPort);
+        clients[clientId].SendChannel.Send(packet, remoteEp);
 
         packet.Free();
     }
     
-    private void ServerWorldSerialize(BitBuffer buffer, int snapshotSeq, int clientId) {
+    private void ServerWorldSerialize(BitBuffer buffer, int snapshotSeq, int clientId)
+    {
+        var clientData = clients[clientId];
+        
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
-        buffer.PutInt(playersHealth[clientId]);
-        buffer.PutInt(playerRecvCmdSeq[clientId]);
-        buffer.PutFloat(playersVelocitiesY[clientId]);
+        buffer.PutInt(clientData.Health);
+        buffer.PutInt(clientData.RecvCommandSeq);
+        buffer.PutFloat(clientData.YVelocity);
         buffer.PutByte(clients.Count);
 
         foreach (var client in clients)
         {
             clientId = client.Key;
-            var clientTransform = client.Value.transform;
+            var clientTransform = client.Value.Controller.transform;
             var position = clientTransform.position;
             var rotation = clientTransform.rotation;
             
@@ -238,54 +226,51 @@ public class ServerEntity : MonoBehaviour
         var playerConnectionPacket = recvChannel.GetPacket();
         
         if (playerConnectionPacket == null) return;
-        Debug.Log("CONNECTION");
+        Debug.Log("PLAYER CONNECTION");
         var buffer = playerConnectionPacket.buffer;
 
-        int newUserId = DeserializeJoin(buffer);
-        
-        // Create cube game object
-        CharacterController newClient = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
-        newClient.GetComponent<Renderer>().material.color = serverCubesColor;
-        if (!capsulesOn) newClient.GetComponent<Renderer>().enabled = false;
-        clients.Add(newUserId, newClient);
+        var newClientId = DeserializeJoin(buffer);
 
-        int clientSendPort = clientBasePort + clientCount * PortsPerClient;
-        int clientRecvPort = clientBasePort + clientCount * PortsPerClient + 1;
-        fromClientPorts.Add(newUserId, clientSendPort);
-        toClientPorts.Add(newUserId, clientRecvPort);
-        fromClientChannels.Add(newUserId, new Channel(clientSendPort));
-        toClientChannels.Add(newUserId, new Channel(clientRecvPort));
-            
-        float clientX = Random.Range(-FloorSide, FloorSide);
-        float clientZ = Random.Range(-FloorSide, FloorSide);
-        Vector3 clientPosition = new Vector3(clientX, InitY, clientZ);
-        Quaternion clientRotation = newClient.transform.rotation;
+        clients.Add(newClientId, new ClientData()); // Add new client data to dictionary
+        var clientData = clients[newClientId];
+        
+        // Instantiate client character controller
+        CharacterController controller = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
+        clientData.Controller = controller;
+        controller.GetComponent<Renderer>().material.color = serverCubesColor;
+        if (!capsulesOn)
+            controller.GetComponent<Renderer>().enabled = false;
 
-        newClient.transform.position = clientPosition;
-        newClient.name = $"ServerCube-{newUserId}";
-        newClient.gameObject.layer = LayerMask.NameToLayer("Server");
+        // Setup client ports & channels
+        var clientSendPort = clientBasePort + clientCount * PortsPerClient;
+        var clientRecvPort = clientBasePort + clientCount * PortsPerClient + 1;
+        clientData.RecvPort = clientSendPort;
+        clientData.SendPort = clientRecvPort;
+        clientData.RecvChannel = new Channel(clientSendPort);
+        clientData.SendChannel = new Channel(clientRecvPort);
         
-        receivedCommands.Add(newUserId, new List<Commands>());
-        playersVelocitiesY.Add(newUserId, 0);
+        // Setup client transform data
+        var clientTransform = controller.transform;
+        var clientX = Random.Range(-FloorSide, FloorSide); // TODO CHANGE TO SPAWN POINTS
+        var clientZ = Random.Range(-FloorSide, FloorSide);
+        var clientPosition = new Vector3(clientX, InitY, clientZ);
+        clientTransform.position = clientPosition;
         
-        playerRecvCmdSeq.Add(newUserId, 0);
-        playerRecvShotSeq.Add(newUserId, 0);
-        playersHealth.Add(newUserId, FullPlayerHealth);
-            
+        controller.name = $"ServerInstance-{newClientId}";
+        controller.gameObject.layer = LayerMask.NameToLayer("Server");
+        clientData.Health = FullPlayerHealth;
         clientCount++;
 
-        SendPlayerJoinedResponse(newUserId, clientPosition, clientRotation);
+        SendPlayerJoinedResponse(newClientId, clientTransform); // Send response to client manager
         
-        playerJoinedTimeouts.Add(newUserId, new Dictionary<int, float>());
-            
-        // Send PlayerJoined to existing clients with timeout
-        foreach (var clientChannelPair in toClientChannels)
+        foreach (var client in clients) // Send event to existing clients with timeout
         {
-            var clientId = clientChannelPair.Key;
-            if (clientId != newUserId)
+            var clientId = client.Key;
+            var data = client.Value;
+            if (clientId != newClientId)
             {
-                SendPlayerJoined(toClientPorts[clientId], toClientChannels[clientId], newUserId, clientPosition, clientRotation);
-                playerJoinedTimeouts[newUserId].Add(clientId, PlayerJoinedTimeout);
+                SendPlayerJoined(data.SendPort, data.SendChannel, newClientId, clientTransform);
+                clientData.PlayerJoinedTimeouts.Add(clientId, PlayerJoinedTimeout);
             }
         }
     }
@@ -297,14 +282,14 @@ public class ServerEntity : MonoBehaviour
         if (messageType != PacketType.Join)
             throw new ArgumentException("Unknown message type received from client manager.");
         
-        int userId = buffer.GetInt();
+        var userId = buffer.GetInt();
         return userId;
     }
 
-    private void SendPlayerJoinedResponse(int newUserId, Vector3 newClientPosition, Quaternion newClientRotation)
+    private void SendPlayerJoinedResponse(int newUserId, Transform newClientTransform)
     {
         var packet = Packet.Obtain();
-        SerializePlayerJoinedResponse(packet.buffer, newUserId, newClientPosition, newClientRotation);
+        SerializePlayerJoinedResponse(packet.buffer, newUserId, newClientTransform.position, newClientTransform.rotation);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -314,11 +299,10 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void SendPlayerJoined(int clientPort, Channel clientChannel, int newUserId, Vector3 newClientPosition,
-        Quaternion newClientRotation)
+    private void SendPlayerJoined(int clientPort, Channel clientChannel, int newUserId, Transform newClientTransform)
     {
         var packet = Packet.Obtain();
-        SerializePlayerJoined(packet.buffer, newUserId, newClientPosition, newClientRotation);
+        SerializePlayerJoined(packet.buffer, newUserId, newClientTransform.position, newClientTransform.rotation);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -331,10 +315,12 @@ public class ServerEntity : MonoBehaviour
     private void SerializePlayerJoinedResponse(BitBuffer buffer, int newUserId, Vector3 newClientPosition,
         Quaternion newClientRotation)
     {
+        var clientData = clients[newUserId];
+        
         buffer.PutByte((int) PacketType.PlayerJoinedResponse);
         buffer.PutInt(newUserId);
-        buffer.PutInt(fromClientPorts[newUserId]);
-        buffer.PutInt(toClientPorts[newUserId]);
+        buffer.PutInt(clientData.RecvPort);
+        buffer.PutInt(clientData.SendPort);
         buffer.PutFloat(serverTime);
         buffer.PutInt(nextSnapshotSeq);
         buffer.PutByte(minInterpolationBufferElems);
@@ -347,12 +333,12 @@ public class ServerEntity : MonoBehaviour
         buffer.PutFloat(newClientRotation.z);
         buffer.PutInt(FullPlayerHealth);
         buffer.PutByte(clientCount - 1);
-        foreach (var clientCubePair in clients)
+        foreach (var clientPair in clients)
         {
-            var clientId = clientCubePair.Key;
+            var clientId = clientPair.Key;
             if (clientId != newUserId)
             {
-                var clientTransform = clientCubePair.Value.transform;
+                var clientTransform = clientPair.Value.Controller.transform;
                 var position = clientTransform.position;
                 var rotation = clientTransform.rotation;
                 
@@ -384,19 +370,19 @@ public class ServerEntity : MonoBehaviour
 
     private void DeserializeClientMessage(BitBuffer buffer, int clientId)
     {
-        PacketType messageType = (PacketType) buffer.GetByte();
+        var messageType = (PacketType) buffer.GetByte();
         
         switch (messageType)
         {
             case PacketType.Commands:
-                List<Commands> commandsList = DeserializeCommands(buffer);
+                var commandsList = DeserializeCommands(buffer);
                 ProcessReceivedCommands(commandsList, clientId);
                 break;
             case PacketType.PlayerJoinedAck:
                 DeserializePlayerJoinedAck(buffer);
                 break;
             case PacketType.PlayerShot:
-                List<Shot> shotsList = DeserializePlayerShot(buffer);
+                var shotsList = DeserializePlayerShot(buffer);
                 ProcessReceivedShots(shotsList, clientId);
                 break;
             default:
@@ -406,16 +392,15 @@ public class ServerEntity : MonoBehaviour
 
     private List<Commands> DeserializeCommands(BitBuffer buffer)
     {
-        List<Commands> commandsList = new List<Commands>();
-        int playerId = buffer.GetInt();
-        int storedCommandLists = buffer.GetInt();
-        int seq = 0;
-        //Debug.Log("STORED CMDS: " + storedCommandLists);
-        for(int i = 0; i < storedCommandLists; i++)
+        var commandsList = new List<Commands>();
+        var playerId = buffer.GetInt();
+        var storedCommandLists = buffer.GetInt();
+        var clientData = clients[playerId];
+        for(var i = 0; i < storedCommandLists; i++)
         {
-            seq = buffer.GetInt();
+            var seq = buffer.GetInt();
             
-            Commands commands = new Commands(
+            var commands = new Commands(
                 seq,
                 buffer.GetByte() > 0,
                 buffer.GetByte() > 0,
@@ -423,48 +408,40 @@ public class ServerEntity : MonoBehaviour
                 buffer.GetByte() > 0,
                 buffer.GetFloat());
 
-            if (playerRecvCmdSeq[playerId] < seq)
+            if (clientData.RecvCommandSeq < seq)
             {
                 commandsList.Add(commands);
-                playerRecvCmdSeq[playerId] = seq;
+                clientData.RecvCommandSeq = seq;
             }
-            if (clientManager.ERROR)
-                ;
         }
-        //Debug.Log("RECV " + storedCommandLists + " COMMANDS AT SERVER UP TO " + seq);
 
         return commandsList;
     }
     
     private void ProcessReceivedCommands(List<Commands> commandsList, int clientId)
     {
-        int receivedCommandSequence = -1;
-        foreach (Commands commands in commandsList)
+        var clientData = clients[clientId];
+        var receivedCommandSequence = -1;
+        foreach (var commands in commandsList)
         {
             receivedCommandSequence = commands.Seq;
             
-            receivedCommands[clientId].Add(commands);
-            //ExecuteClientInput(clientCubes[clientId], commands);
+            clientData.RecvCommands.Add(commands);
         }
-        //Debug.Log("SERVER - SENDING ACK WITH SEQ " + receivedCommandSequence);
-        if (clientManager.ERROR)
-            ;
+        
         var packet = Packet.Obtain();
         ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[clientId]);
-        toClientChannels[clientId].Send(packet, remoteEp);
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), clientData.SendPort);
+        clientData.SendChannel.Send(packet, remoteEp);
 
         packet.Free();
     }
     
     private void ServerSerializeCommandAck(BitBuffer buffer, int commandSequence)
     {
-        //Debug.Log("SENDING ACK FROM SERVER: " + commandSequence);
-        if (clientManager.ERROR)
-            ;
         buffer.PutByte((int) PacketType.CommandsAck);
         buffer.PutInt(commandSequence);
     }
@@ -472,34 +449,28 @@ public class ServerEntity : MonoBehaviour
     private void DeserializePlayerJoinedAck(BitBuffer buffer)
     {
         var clientId = buffer.GetInt();
-        var connectedPlayerId = buffer.GetInt();
-        playerJoinedTimeouts[connectedPlayerId].Remove(clientId);
-        if (playerJoinedTimeouts[connectedPlayerId].Count == 0)
-        {
-            playerJoinedTimeouts.Remove(connectedPlayerId);
-        }
+        var connectedPlayerId = buffer.GetInt(); // New player
+        var clientData = clients[connectedPlayerId];
+        clientData.PlayerJoinedTimeouts.Remove(clientId);
     }
     
     private List<Shot> DeserializePlayerShot(BitBuffer buffer)
     {
-        List<Shot> shotsList = new List<Shot>();
-        int playerId = buffer.GetInt();
-        int storedShots = buffer.GetInt();
-        int seq = 0;
-        
-        for(int i = 0; i < storedShots; i++)
-        {
-            seq = buffer.GetInt();
-            
-            Shot shot = new Shot(
-                seq,
-                buffer.GetInt()
-            );
+        var shotsList = new List<Shot>();
+        var playerId = buffer.GetInt();
+        var storedShots = buffer.GetInt();
+        var clientData = clients[playerId];
 
-            if (playerRecvShotSeq[playerId] < seq)
+        for(var i = 0; i < storedShots; i++)
+        {
+            var seq = buffer.GetInt();
+            
+            var shot = new Shot(seq, buffer.GetInt());
+
+            if (clientData.RecvShotSeq < seq)
             {
                 shotsList.Add(shot);
-                playerRecvShotSeq[playerId] = seq;
+                clientData.RecvShotSeq = seq;
             }
         }
 
@@ -508,31 +479,33 @@ public class ServerEntity : MonoBehaviour
     
     private void ProcessReceivedShots(List<Shot> shotsList, int shooterId)
     {
-        int recvdShotSequence = -1;
-        foreach (Shot shot in shotsList)
+        var shooterData = clients[shooterId];
+        var recvShotSequence = -1;
+        foreach (var shot in shotsList)
         {
-            recvdShotSequence = shot.Seq;
+            recvShotSequence = shot.Seq;
 
-            playersHealth[shot.ShotPlayerId] -= ShotDamage;
+            clients[shot.ShotPlayerId].Health -= ShotDamage;
             // CHECK IF DEAD...
             
-            foreach (var clientChannelPair in toClientChannels)
+            foreach (var clientPair in clients)
             {
-                var clientId = clientChannelPair.Key;
+                var clientId = clientPair.Key;
+                var clientData = clientPair.Value;
                 if (clientId != shooterId)
                 {
-                    SendPlayerShotBroadcast(toClientPorts[clientId], toClientChannels[clientId], shooterId, shot.ShotPlayerId);
+                    SendPlayerShotBroadcast(clientData.SendPort, clientData.SendChannel, shooterId, shot.ShotPlayerId);
                 }
             }
         }
         
         var packet = Packet.Obtain();
-        ServerSerializeShotAck(packet.buffer, recvdShotSequence);
+        ServerSerializeShotAck(packet.buffer, recvShotSequence);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), toClientPorts[shooterId]);
-        toClientChannels[shooterId].Send(packet, remoteEp);
+        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), shooterData.SendPort);
+        shooterData.SendChannel.Send(packet, remoteEp);
 
         packet.Free();
     }

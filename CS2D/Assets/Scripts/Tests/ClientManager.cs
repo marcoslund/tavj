@@ -25,8 +25,6 @@ public class ClientManager : MonoBehaviour
     
     private bool createdFirstPlayer;
     [HideInInspector] public GameObject firstPlayer;
-
-    public bool ERROR = false; // TODO DELETE
     
     // Start is called before the first frame update
     void Start()
