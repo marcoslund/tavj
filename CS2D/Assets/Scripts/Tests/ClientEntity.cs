@@ -24,7 +24,6 @@ public class ClientEntity : MonoBehaviour
     private Commands commandsToSend = new Commands();
     public List<Commands> unAckedCommands = new List<Commands>();
     private List<Commands> predictionCommands = new List<Commands>();
-    //private CharacterController predictionCopy;
 
     private Dictionary<int, Transform> otherPlayers = new Dictionary<int, Transform>();
     private Color clientColor;
@@ -57,7 +56,7 @@ public class ClientEntity : MonoBehaviour
 
     public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
         int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
-        /*GameObject predictionCopy,*/ ClientManager clientManager)
+        ClientManager clientManager)
     {
         this.sendPort = sendPort;
         //sendChannel = new Channel(sendPort);
@@ -79,13 +78,7 @@ public class ClientEntity : MonoBehaviour
 
         currentSpeed = walkingSpeed;
 
-        //this.predictionCopy = predictionCopy.GetComponent<CharacterController>();
-        //predictionCopy.GetComponent<Renderer>().enabled = false;
-        //predictionCopy.transform.position = position;
-        //predictionCopy.transform.rotation = rotation;
-        //Physics.IgnoreCollision(_characterController, this.predictionCopy);
-
-        channel = clientManager.serverEntity.clients[clientId].SendChannel; // TO DELETE
+        channel = clientManager.serverEntity.clients[clientId].SendChannel; // TODO DELETE
         
         cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
         raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
@@ -115,19 +108,6 @@ public class ClientEntity : MonoBehaviour
         predictionCommands.Add(new Commands(commandsToSend));
         SendCommands(unAckedCommands);
         commandsToSend.Seq++;
-        
-        /*if (commandsToSend.hasCommand())
-        {
-            MovePlayer(commandsToSend);
-            unAckedCommands.Add(new Commands(commandsToSend));
-            predictionCommands.Add(new Commands(commandsToSend));
-            SendCommands(unAckedCommands);
-            commandsToSend.Seq++;
-        }
-        else
-        {
-            ApplyGravity();
-        }*/
     }
 
     private void Update()
@@ -224,10 +204,10 @@ public class ClientEntity : MonoBehaviour
     {
         return currentSnapValue + (nextSnapValue - currentSnapValue) * t;
     }
-    
-    public void DeserializeBuffer(BitBuffer buffer)
+
+    private void DeserializeBuffer(BitBuffer buffer)
     {
-        PacketType messageType = (PacketType) buffer.GetByte();
+        var messageType = (PacketType) buffer.GetByte();
 
         switch (messageType)
         {
@@ -373,29 +353,11 @@ public class ClientEntity : MonoBehaviour
         return move;
     }
     
-    /*private void ApplyGravity()
-    {
-        Vector3 move = Vector3.zero;
-        
-        if (!_characterController.isGrounded)
-        {
-            velocityY += gravityValue * Time.fixedDeltaTime;
-            move.y = velocityY * Time.fixedDeltaTime;
-        }
-        else
-        {
-            velocityY = gravityValue * Time.fixedDeltaTime;
-            move.y = gravityValue * Time.fixedDeltaTime;
-        }
-        
-        _characterController.Move(move);
-    }*/
-    
     // Serialize & send commands to server
     private void SendCommands(List<Commands> commandsList)
     {
         var packet = Packet.Obtain();
-        SerializeCommands(packet.buffer, commandsList);
+        ClientSerializationManager.SerializeCommands(packet.buffer, commandsList, clientId);
         packet.buffer.Flush();
 
         var serverIP = "127.0.0.1";
@@ -405,33 +367,8 @@ public class ClientEntity : MonoBehaviour
         packet.Free();
     }
 
-    /*
-     * -- FORMAT --
-     * Packet Type (byte)
-     * Client ID (int)
-     * Commands Count (int)
-     * (Commands...)
-     */
-    private void SerializeCommands(BitBuffer buffer, List<Commands> commandsList) // TODO SEND ROTATION
-    {
-        buffer.PutByte((int) PacketType.Commands);
-        buffer.PutInt(clientId);
-        buffer.PutInt(unAckedCommands.Count);
-        foreach (Commands commands in commandsList)
-        {
-            buffer.PutInt(commands.Seq);
-            buffer.PutByte(commands.Up ? 1 : 0);
-            buffer.PutByte(commands.Down ? 1 : 0);
-            buffer.PutByte(commands.Left ? 1 : 0);
-            buffer.PutByte(commands.Right ? 1 : 0);
-            buffer.PutFloat(commands.RotationY);
-        }
-        //Debug.Log("SENDING COMMANDS TO SERVER UP TO " + commandsToSend.Seq);
-    }
-    
     private int DeserializeCommandAck(BitBuffer buffer)
     {
-        //Debug.Log("RECV ACK - UNACKED COMMANDS " + unAckedCommands.Count);
         return buffer.GetInt();
     }
 
@@ -484,7 +421,7 @@ public class ClientEntity : MonoBehaviour
     private void SendPlayerJoinedAck(int newPlayerId)
     {
         var packet = Packet.Obtain();
-        SerializePlayerJoinedAck(packet.buffer, newPlayerId);
+        ClientSerializationManager.SerializePlayerJoinedAck(packet.buffer, newPlayerId, clientId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -494,19 +431,6 @@ public class ClientEntity : MonoBehaviour
         packet.Free();
     }
 
-    /*
-     * -- FORMAT --
-     * Packet Type (byte)
-     * Client ID (int)
-     * New Player ID (int)
-     */
-    private void SerializePlayerJoinedAck(BitBuffer buffer, int newPlayerId)
-    {
-        buffer.PutByte((int) PacketType.PlayerJoinedAck);
-        buffer.PutInt(clientId);
-        buffer.PutInt(newPlayerId);
-    }
-    
     private void OnDestroy() {
         //sendChannel.Disconnect();
         //recvChannel.Disconnect();
@@ -519,7 +443,7 @@ public class ClientEntity : MonoBehaviour
         shotSeq++;
         
         var packet = Packet.Obtain();
-        SerializePlayerShot(packet.buffer);
+        ClientSerializationManager.SerializePlayerShot(packet.buffer, unAckedShots, clientId);
         packet.buffer.Flush();
 
         string serverIP = "127.0.0.1";
@@ -529,25 +453,6 @@ public class ClientEntity : MonoBehaviour
         packet.Free();
     }
 
-    /*
-     * -- FORMAT --
-     * Packet Type (byte)
-     * Client ID (int)
-     * Shots Count (int)
-     * (Shots...)
-     */
-    private void SerializePlayerShot(BitBuffer buffer)
-    {
-        buffer.PutByte((int) PacketType.PlayerShot);
-        buffer.PutInt(clientId);
-        buffer.PutInt(unAckedShots.Count);
-        foreach (var shot in unAckedShots)
-        {
-            buffer.PutInt(shot.Seq);
-            buffer.PutInt(shot.ShotPlayerId);
-        }
-    }
-    
     private int DeserializeShotAck(BitBuffer buffer)
     {
         return buffer.GetInt();

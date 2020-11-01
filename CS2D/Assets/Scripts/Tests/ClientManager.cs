@@ -143,11 +143,8 @@ public class ClientManager : MonoBehaviour
     
         var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
     
-        //GameObject predictionCopy = Instantiate(cubePrefab, newClient.transform);
-        //predictionCopy.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
-    
         clientEntity.InitializeClientEntity(sendPort, recvPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
-            position, rotation, health, usedClientLayersCount, /*predictionCopy,*/ this);
+            position, rotation, health, usedClientLayersCount, this);
         usedClientLayersCount++;
 
         InitializeOtherPlayerCopies(buffer, clientId, clientEntity);
