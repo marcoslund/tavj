@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 3486015604801637707}
   - component: {fileID: -2987233715533082830}
   - component: {fileID: 1249143957180713320}
+  - component: {fileID: 2751432109598884126}
   m_Layer: 0
   m_Name: CopyCube
   m_TagString: Untagged
@@ -114,6 +115,19 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 80
   m_CollisionDetection: 0
+--- !u!114 &2751432109598884126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3486015604801637705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf14594b9d9cede4a9a8b5a7faf812d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  animator: {fileID: 66142366750283628}
 --- !u!1001 &9209530109498647070
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -201,11 +215,22 @@ PrefabInstance:
       propertyPath: m_LocalScale.z
       value: 1.35
       objectReference: {fileID: 0}
+    - target: {fileID: 9161499180205569394, guid: 92c351d44a254e241b8aad8ee64e9c01,
+        type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: 98108dc6a05b63645bcdcf2df06512dd, type: 3}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 92c351d44a254e241b8aad8ee64e9c01, type: 3}
 --- !u!4 &6199997589186465046 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3009532797977276168, guid: 92c351d44a254e241b8aad8ee64e9c01,
+    type: 3}
+  m_PrefabInstance: {fileID: 9209530109498647070}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &66142366750283628 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 9161499180205569394, guid: 92c351d44a254e241b8aad8ee64e9c01,
     type: 3}
   m_PrefabInstance: {fileID: 9209530109498647070}
   m_PrefabAsset: {fileID: 0}

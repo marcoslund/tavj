@@ -16197,7 +16197,6 @@ MonoBehaviour:
     type: 3}
   maxClientCount: 10
   firstPlayer: {fileID: 0}
-  ERROR: 0
 --- !u!4 &1176388128
 Transform:
   m_ObjectHideFlags: 0
@@ -20667,6 +20666,16 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 66142366750283628, guid: 313bcb7fd7283492e8e15fc30ec40be2,
+        type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: 98108dc6a05b63645bcdcf2df06512dd, type: 3}
+    - target: {fileID: 66142366750283628, guid: 313bcb7fd7283492e8e15fc30ec40be2,
+        type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3486015604801637704, guid: 313bcb7fd7283492e8e15fc30ec40be2,
         type: 3}
       propertyPath: m_LocalPosition.x
