@@ -144,7 +144,7 @@ public class ClientManager : MonoBehaviour
         var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
     
         clientEntity.InitializeClientEntity(sendPort, recvPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
-            position, rotation, health, usedClientLayersCount, this);
+            position, rotation, health, usedClientLayersCount, this, !createdFirstPlayer);
         usedClientLayersCount++;
 
         InitializeOtherPlayerCopies(buffer, clientId, clientEntity);

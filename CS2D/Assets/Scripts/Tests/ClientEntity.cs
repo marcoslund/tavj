@@ -25,7 +25,7 @@ public class ClientEntity : MonoBehaviour
     public List<Commands> unAckedCommands = new List<Commands>();
     private List<Commands> predictionCommands = new List<Commands>();
 
-    private Dictionary<int, Transform> otherPlayers = new Dictionary<int, Transform>();
+    private Dictionary<int, ClientCopyEntity> otherPlayers = new Dictionary<int, ClientCopyEntity>();
     private Color clientColor;
 
     private CharacterController _characterController;
@@ -54,9 +54,11 @@ public class ClientEntity : MonoBehaviour
     
     public AudioSource weaponChanging;
 
+    private bool isFirstClient;
+
     public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
         int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
-        ClientManager clientManager)
+        ClientManager clientManager, bool isFirstClient)
     {
         this.sendPort = sendPort;
         //sendChannel = new Channel(sendPort);
@@ -79,12 +81,17 @@ public class ClientEntity : MonoBehaviour
         currentSpeed = walkingSpeed;
 
         channel = clientManager.serverEntity.clients[clientId].SendChannel; // TODO DELETE
+
+        this.isFirstClient = isFirstClient; // TODO DELETE
+
+        if (isFirstClient)
+        {
+            cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
+            raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
+            icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
         
-        cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
-        raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
-        icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
-        
-        StartCoroutine ("SpawnWeaponUponStart");
+            StartCoroutine ("SpawnWeaponUponStart");
+        }
     }
     
     private IEnumerator SpawnWeaponUponStart() {
@@ -102,7 +109,7 @@ public class ClientEntity : MonoBehaviour
     {
         commandsToSend.RotationY = transform.rotation.eulerAngles.y;
         var move = MovePlayer(commandsToSend);
-        if (handsAnimator)
+        if (isFirstClient && handsAnimator)
             handsAnimator.SetBool("Moving", commandsToSend.isMoveCommand());
         unAckedCommands.Add(new Commands(commandsToSend));
         predictionCommands.Add(new Commands(commandsToSend));
@@ -176,9 +183,9 @@ public class ClientEntity : MonoBehaviour
     {
         var t =  (clientTime - prevSnapshot.Time) / (nextSnapshot.Time - prevSnapshot.Time);
         
-        foreach (var playerTransformPair in otherPlayers)
+        foreach (var playerCopyPair in otherPlayers)
         {
-            var playerId = playerTransformPair.Key;
+            var playerId = playerCopyPair.Key;
 
             if (!prevSnapshot.Positions.ContainsKey(playerId)) continue;
             
@@ -194,9 +201,7 @@ public class ClientEntity : MonoBehaviour
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
 
-            var playerTransform = playerTransformPair.Value;
-            playerTransform.position = position;
-            playerTransform.rotation = rotation;
+            playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }
     }
 
@@ -415,7 +420,7 @@ public class ClientEntity : MonoBehaviour
         newClient.transform.rotation = rotation;
         newClient.GetComponent<Renderer>().material.color = clientColor;
         
-        otherPlayers.Add(connectedPlayerId, newClient.transform);
+        otherPlayers.Add(connectedPlayerId, newClient.GetComponent<ClientCopyEntity>());
     }
     
     private void SendPlayerJoinedAck(int newPlayerId)
