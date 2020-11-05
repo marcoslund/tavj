@@ -34,10 +34,8 @@ public class ServerEntity : MonoBehaviour
     public int nextSnapshotSeq = 0; // Next snapshot to send
     
     private bool serverConnected = true;
-
+    public List<Transform> spawnPoints;
     private readonly Color serverCubesColor = Color.white;
-    private const float FloorSide = 4.5f; // Hardcoded
-    public float InitY = 1.1f; //0.6f;
 
     private float playerSpeed = 5.0f;
     /*public float jumpHeight = 1.0f;
@@ -50,7 +48,7 @@ public class ServerEntity : MonoBehaviour
     public bool capsulesOn = false;
 
     public ClientManager clientManager; // TODO DELETE
-    
+
     // Start is called before the first frame update
     private void Awake() {
         sendChannel = new Channel(sendPort);
@@ -221,9 +219,7 @@ public class ServerEntity : MonoBehaviour
         
         // Setup client transform data
         var clientTransform = controller.transform;
-        var clientX = Random.Range(-FloorSide, FloorSide); // TODO CHANGE TO SPAWN POINTS
-        var clientZ = Random.Range(-FloorSide, FloorSide);
-        var clientPosition = new Vector3(clientX, InitY, clientZ);
+        var clientPosition = spawnPoints[Random.Range(0, spawnPoints.Count)].position;
         clientTransform.position = clientPosition;
         
         controller.name = $"ServerInstance-{newClientId}";

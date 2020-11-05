@@ -160,22 +160,22 @@ public class ClientEntity : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.W))
             commandsToSend.Up = true;
-        else if (Input.GetKeyUp(KeyCode.W) || (commandsToSend.Up && !Input.GetKey(KeyCode.W))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.W) || (commandsToSend.Up && !Input.GetKey(KeyCode.W))) // TODO DELETE SECOND CHECK
             commandsToSend.Up = false;
         
         if (Input.GetKeyDown(KeyCode.S))
             commandsToSend.Down = true;
-        else if (Input.GetKeyUp(KeyCode.S) || (commandsToSend.Down && !Input.GetKey(KeyCode.S))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.S) || (commandsToSend.Down && !Input.GetKey(KeyCode.S))) // TODO DELETE SECOND CHECK
             commandsToSend.Down = false;
         
         if (Input.GetKeyDown(KeyCode.A))
             commandsToSend.Left = true;
-        else if (Input.GetKeyUp(KeyCode.A) || (commandsToSend.Left && !Input.GetKey(KeyCode.A))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.A) || (commandsToSend.Left && !Input.GetKey(KeyCode.A))) // TODO DELETE SECOND CHECK
             commandsToSend.Left = false;
 
         if (Input.GetKeyDown(KeyCode.D))
             commandsToSend.Right = true;
-        else if (Input.GetKeyUp(KeyCode.D) || (commandsToSend.Right && !Input.GetKey(KeyCode.D))) // TO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.D) || (commandsToSend.Right && !Input.GetKey(KeyCode.D))) // TODO DELETE SECOND CHECK
             commandsToSend.Right = false;
     }
     

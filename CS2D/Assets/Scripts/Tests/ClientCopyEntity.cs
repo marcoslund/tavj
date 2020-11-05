@@ -31,7 +31,7 @@ public class ClientCopyEntity : MonoBehaviour
     {
         var deltaX = Mathf.Abs(delta.x);
         var deltaZ = Mathf.Abs(delta.z);
-        Debug.Log(gameObject.name + " " + delta.ToString("F8"));
+        
         if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
         else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
         else animator.SetFloat("Horizontal Movement", 0);
