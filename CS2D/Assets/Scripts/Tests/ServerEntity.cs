@@ -20,8 +20,9 @@ public class ServerEntity : MonoBehaviour
     private const int PortsPerClient = 2;
     public int sendPort = 9001;
     public int recvPort = 9000;
-    public Channel sendChannel;
-    public Channel recvChannel;
+    //public Channel sendChannel;
+    //public Channel recvChannel;
+    private Channel connectionChannel;
     private readonly int clientBasePort = 9010;
     public int clientCount = 0;
     private const float PlayerJoinedTimeout = 1f;
@@ -51,9 +52,10 @@ public class ServerEntity : MonoBehaviour
 
     // Start is called before the first frame update
     private void Awake() {
-        sendChannel = new Channel(sendPort);
-        recvChannel = new Channel(recvPort);
-        
+        //sendChannel = new Channel(sendPort);
+        //recvChannel = new Channel(recvPort);
+        connectionChannel = new Channel(9000);
+            
         sendRate = 1f / pps;
     }
 
@@ -191,7 +193,7 @@ public class ServerEntity : MonoBehaviour
 
     private void ListenForPlayerConnections()
     {
-        var playerConnectionPacket = recvChannel.GetPacket();
+        var playerConnectionPacket = connectionChannel.GetPacket();//recvChannel.GetPacket();
         
         if (playerConnectionPacket == null) return;
         Debug.Log("PLAYER CONNECTION");
@@ -262,7 +264,7 @@ public class ServerEntity : MonoBehaviour
 
         string serverIP = "127.0.0.1";
         var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        sendChannel.Send(packet, remoteEp);
+        connectionChannel.Send(packet, remoteEp);
 
         packet.Free();
     }

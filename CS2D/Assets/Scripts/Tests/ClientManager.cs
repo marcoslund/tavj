@@ -8,11 +8,13 @@ using UnityEngine;
 public class ClientManager : MonoBehaviour
 {
     // Channels to and from server
-    private int sendPort = 9000;
-    private int recvPort = 9001;
-    //private Channel sendChannel; TODO CANNOT REUSE PORTS
-    //private Channel recvChannel;
-    public ServerEntity serverEntity;
+    private const int ServerPort = 9000;
+    private const int ManagerPort = 9001;
+    private Channel channel;
+    private string serverIp;
+    private IPEndPoint serverIpEndPoint;
+    
+    public ServerEntity serverEntity; // TODO DELETE
 
     private int clientCounter = 0;
     private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>();
@@ -29,8 +31,9 @@ public class ClientManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        //sendChannel = new Channel(sendPort);
-        //recvChannel = new Channel(recvPort);
+        channel	= new Channel(ManagerPort);
+        serverIp = PlayerPrefs.GetString("ServerIP", "127.0.0.1");
+        serverIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), ServerPort);
     }
 
     // Update is called once per frame
@@ -46,7 +49,7 @@ public class ClientManager : MonoBehaviour
         }
 
         // Listen for server packets
-        var packet = serverEntity.sendChannel.GetPacket();//recvChannel.GetPacket();
+        var packet = channel.GetPacket();
         if (packet != null) {
             var buffer = packet.buffer;
             Deserialize(buffer);
@@ -80,9 +83,7 @@ public class ClientManager : MonoBehaviour
         SerializeClientConnection(packet.buffer, clientId);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        serverEntity.recvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+        channel.Send(packet, serverIpEndPoint);
         packet.Free();
     }
     
@@ -91,7 +92,7 @@ public class ClientManager : MonoBehaviour
      * Packet Type (byte)
      * Client ID (int)
      */
-    public void SerializeClientConnection(BitBuffer buffer, int clientId) {
+    private static void SerializeClientConnection(BitBuffer buffer, int clientId) {
         buffer.PutByte((int) PacketType.Join);
         buffer.PutInt(clientId);
     }

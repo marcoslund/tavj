@@ -23,13 +23,13 @@ public class PlayMenu : MonoBehaviour
     public void HostGame()
     {
         SavePlayerPrefs();
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+        SceneManager.LoadScene("Server Game");
     }
 
     public void JoinGame()
     {
         SavePlayerPrefs();
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+        SceneManager.LoadScene("Client Game");
     }
     
     private void SavePlayerPrefs()
@@ -37,7 +37,7 @@ public class PlayMenu : MonoBehaviour
         var playerName = playerNameInput.text;
         var ip = gameIpInput.text;
         PlayerPrefs.SetString("PlayerName", string.IsNullOrWhiteSpace(playerName)? "Player" : playerName);
-        PlayerPrefs.SetString("IP", string.IsNullOrWhiteSpace(ip)? "127.0.0.1" : ip);
+        PlayerPrefs.SetString("ServerIP", string.IsNullOrWhiteSpace(ip)? "127.0.0.1" : ip);
         PlayerPrefs.Save();
     }
 }
