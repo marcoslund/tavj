@@ -17,13 +17,16 @@ public class ServerEntity : MonoBehaviour
     
     [HideInInspector] public Dictionary<int, ClientData> clients = new Dictionary<int, ClientData>();
     
-    private const int PortsPerClient = 2;
-    public int sendPort = 9001;
-    public int recvPort = 9000;
-    //public Channel sendChannel;
-    //public Channel recvChannel;
+    
+    private const int ServerPort = 9000;
+    private const int ConnectionPort = 9001;
     private Channel connectionChannel;
-    private readonly int clientBasePort = 9010;
+    private string serverIp;
+    private IPEndPoint connectionIpEndPoint;
+    
+    private const int PortsPerClient = 2;
+    private const int ClientBasePort = 9010;
+    
     public int clientCount = 0;
     private const float PlayerJoinedTimeout = 1f;
     public int minInterpolationBufferElems = 2;
@@ -38,24 +41,20 @@ public class ServerEntity : MonoBehaviour
     public List<Transform> spawnPoints;
     private readonly Color serverCubesColor = Color.white;
 
-    private float playerSpeed = 5.0f;
-    /*public float jumpHeight = 1.0f;
-    public float jumpSpeed = 10.0f;*/
-    private float gravityValue = -9.81f;
-    
-    public const int FullPlayerHealth = 100;
-    public const int ShotDamage = 15;
+    private const float PlayerSpeed = 5.0f;
+    private const float GravityValue = -9.81f;
+
+    private const int FullPlayerHealth = 100;
+    private const int ShotDamage = 10;
 
     public bool capsulesOn = false;
 
-    public ClientManager clientManager; // TODO DELETE
-
     // Start is called before the first frame update
     private void Awake() {
-        //sendChannel = new Channel(sendPort);
-        //recvChannel = new Channel(recvPort);
-        connectionChannel = new Channel(9000);
-            
+        serverIp = PlayerPrefs.GetString("ServerIP", "127.0.0.1");
+        connectionChannel = new Channel(ServerPort);
+        connectionIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), ConnectionPort);
+        
         sendRate = 1f / pps;
     }
 
@@ -146,20 +145,20 @@ public class ServerEntity : MonoBehaviour
         {
             Vector3 move = Vector3.zero;
             /*bool canJump = false;*/
-            move.x = commands.GetHorizontal() * Time.fixedDeltaTime * playerSpeed;
-            move.z = commands.GetVertical() * Time.fixedDeltaTime * playerSpeed;
+            move.x = commands.GetHorizontal() * Time.fixedDeltaTime * PlayerSpeed;
+            move.z = commands.GetVertical() * Time.fixedDeltaTime * PlayerSpeed;
             ctrlTransform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
             move = ctrlTransform.TransformDirection(move);
             
             if (!controller.isGrounded)
             {
-                velocity += gravityValue * Time.fixedDeltaTime;
+                velocity += GravityValue * Time.fixedDeltaTime;
                 move.y = velocity * Time.fixedDeltaTime;
             }
             else
             {
-                velocity = gravityValue * Time.fixedDeltaTime;
-                move.y = gravityValue * Time.fixedDeltaTime;
+                velocity = GravityValue * Time.fixedDeltaTime;
+                move.y = GravityValue * Time.fixedDeltaTime;
                 //canJump = true;
             }
             
@@ -193,7 +192,7 @@ public class ServerEntity : MonoBehaviour
 
     private void ListenForPlayerConnections()
     {
-        var playerConnectionPacket = connectionChannel.GetPacket();//recvChannel.GetPacket();
+        var playerConnectionPacket = connectionChannel.GetPacket();
         
         if (playerConnectionPacket == null) return;
         Debug.Log("PLAYER CONNECTION");
@@ -212,8 +211,8 @@ public class ServerEntity : MonoBehaviour
             controller.GetComponent<Renderer>().enabled = false;
 
         // Setup client ports & channels
-        var clientSendPort = clientBasePort + clientCount * PortsPerClient;
-        var clientRecvPort = clientBasePort + clientCount * PortsPerClient + 1;
+        var clientSendPort = ClientBasePort + clientCount * PortsPerClient;
+        var clientRecvPort = ClientBasePort + clientCount * PortsPerClient + 1;
         clientData.RecvPort = clientSendPort;
         clientData.SendPort = clientRecvPort;
         clientData.RecvChannel = new Channel(clientSendPort);
@@ -262,9 +261,7 @@ public class ServerEntity : MonoBehaviour
             FullPlayerHealth, clientCount);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        connectionChannel.Send(packet, remoteEp);
+        connectionChannel.Send(packet, connectionIpEndPoint);
 
         packet.Free();
     }
