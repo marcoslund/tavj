@@ -29,8 +29,8 @@ public class ClientCopyEntity : MonoBehaviour
 
     private void SetAnimatorMovementParameters(Vector3 delta)
     {
-        var deltaX = Mathf.Abs(delta.x);
-        var deltaZ = Mathf.Abs(delta.z);
+        var deltaX = delta.x;
+        var deltaZ = delta.z;
         
         if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
         else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);

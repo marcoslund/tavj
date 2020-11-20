@@ -52,8 +52,6 @@ public class ClientEntity : MonoBehaviour
     
     public AudioSource weaponChanging;
 
-    private bool isFirstClient;
-
     private void Awake()
     {
         clientId = PlayerPrefs.GetInt("ClientId");
@@ -124,7 +122,7 @@ public class ClientEntity : MonoBehaviour
     {
         commandsToSend.RotationY = transform.rotation.eulerAngles.y;
         var move = MovePlayer(commandsToSend);
-        if (isFirstClient && handsAnimator)
+        if (handsAnimator)
             handsAnimator.SetBool("Moving", commandsToSend.isMoveCommand());
         unAckedCommands.Add(new Commands(commandsToSend));
         predictionCommands.Add(new Commands(commandsToSend));

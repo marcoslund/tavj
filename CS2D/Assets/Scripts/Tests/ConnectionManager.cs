@@ -15,32 +15,30 @@ public class ConnectionManager : MonoBehaviour
     private string serverIp;
     private IPEndPoint serverIpEndPoint;
     
-    private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>();
+    private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>(); // TODO REMOVE DICTIONARY
     private const float ClientConnectionTimeout = 1f;
     
-    public GameObject cubePrefab;
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        channel	= new Channel(ManagerPort);
-    }
+    //public GameObject cubePrefab;
 
     // Update is called once per frame
     void Update()
     {
-        // Listen for server packets
-        var packet = channel.GetPacket();
-        if (packet != null) {
-            var buffer = packet.buffer;
-            Deserialize(buffer);
-        }
+        if (channel != null)
+        {
+            // Listen for server packets
+            var packet = channel.GetPacket();
+            if (packet != null) {
+                var buffer = packet.buffer;
+                Deserialize(buffer);
+            }
 
-        UpdateConnectionTimeouts();
+            UpdateConnectionTimeouts();
+        }
     }
 
     public void InitializePlayerConnection()
     {
+        channel	= new Channel(ManagerPort);
         serverIp = PlayerPrefs.GetString("ServerIp", "127.0.0.1");
         serverIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), ServerPort);
         
@@ -103,6 +101,7 @@ public class ConnectionManager : MonoBehaviour
                 {
                     Debug.Log("RECV CONNECTION RESPONSE");
                     SavePlayerAttributes(buffer, clientId);
+                    channel.Disconnect();
                     SceneManager.LoadScene("Client Game");
                 }
 
