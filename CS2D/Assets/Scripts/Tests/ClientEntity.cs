@@ -40,7 +40,7 @@ public class ClientEntity : MonoBehaviour
     public List<Shot> unAckedShots = new List<Shot>();
     public int health;
     private int startingHealth;
-    public PlayerHealth playerHealthManager;
+    private PlayerHealth _playerHealthManager;
 
     [HideInInspector] public Transform cameraMain;
     [HideInInspector] public Vector3 cameraPosition;
@@ -83,6 +83,7 @@ public class ClientEntity : MonoBehaviour
             );
         health = PlayerPrefs.GetInt("ClientHealth");;
         startingHealth = health;
+        _playerHealthManager = GetComponent<PlayerHealth>();
         characterController = GetComponent<CharacterController>();
         //this.clientLayer = clientLayer;
         currentSpeed = walkingSpeed;
@@ -434,7 +435,7 @@ public class ClientEntity : MonoBehaviour
 
     public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
     {
-        var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
+        var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation);
         newClient.name = $"{connectedPlayerId}";
         //newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");  // TODO CHANGE LAYER
         newClient.transform.position = position;
@@ -500,9 +501,8 @@ public class ClientEntity : MonoBehaviour
         if (shotPlayerId == clientId)
         {
             health = shotPlayerHealth;
-            playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
+            _playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
         }
-        
         // TODO SHOW SHOOTING (& DEATH) ANIMATION & BLOOD, SEND ACK
     }
 }
