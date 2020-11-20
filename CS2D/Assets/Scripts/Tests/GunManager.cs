@@ -112,7 +112,7 @@ public class GunManager : MonoBehaviour
 
 	private void Awake()
 	{
-		player = GameObject.FindWithTag("ClientController").GetComponent<ClientManager>().firstPlayer.transform;
+		player = GameObject.FindWithTag("ClientEntity").transform;
 		firstPersonView = player.GetComponent<FirstPersonView>();
 		//shootManager = player.GetComponent<ShootManager>();
 		mainCamera = firstPersonView.myCamera;

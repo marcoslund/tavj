@@ -26,10 +26,10 @@ public class ClientEntity : MonoBehaviour
     private readonly List<Commands> predictionCommands = new List<Commands>();
 
     private readonly Dictionary<int, ClientCopyEntity> otherPlayers = new Dictionary<int, ClientCopyEntity>();
-    private Color clientColor;
+    //private Color clientColor;
 
     private CharacterController characterController;
-    private int clientLayer;
+    //private int clientLayer;
     [HideInInspector] public float currentSpeed;
     
     public float walkingSpeed = 5.0f; // TODO HARDCODED, RECV FROM SERVER
@@ -54,53 +54,70 @@ public class ClientEntity : MonoBehaviour
 
     private bool isFirstClient;
 
-    public void InitializeClientEntity(int clientPort, string serverIp, int serverPort, int clientId, float clientTime, int displaySeq, 
-        int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
-        bool isFirstClient)
+    private void Awake()
     {
-        this.clientPort = clientPort;
-        this.serverPort = serverPort;
+        clientId = PlayerPrefs.GetInt("ClientId");
+        transform.name = $"Client-{clientId}";
+        
+        /* Networking variables */
+        clientPort = PlayerPrefs.GetInt("ClientPort");
+        serverPort = PlayerPrefs.GetInt("ServerPort");
         channel = new Channel(clientPort);
+        var serverIp = PlayerPrefs.GetString("ServerIp");
         serverIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);
         
-        this.clientId = clientId;
-        this.clientTime = clientTime;
-        this.displaySeq = displaySeq;
-        this.minInterpolationBufferElems = minInterpolationBufferElems;
+        /* Client snapshot variables */
+        clientTime = PlayerPrefs.GetFloat("ClientTime");
+        displaySeq = PlayerPrefs.GetInt("DisplaySequence");
+        minInterpolationBufferElems = PlayerPrefs.GetInt("MinInterpolationBufferElements");
         
-        this.clientColor = clientColor;
-        var rend = GetComponent<Renderer>();
-        rend.material.color = clientColor;
-        transform.position = position;
-        transform.rotation = rotation;
-        this.health = health;
+        /* Client game variables */
+        transform.position = new Vector3(
+                PlayerPrefs.GetFloat("ClientPosX"),
+                PlayerPrefs.GetFloat("ClientPosY"),
+                PlayerPrefs.GetFloat("ClientPosZ")
+            );
+        transform.rotation = new Quaternion(
+            PlayerPrefs.GetFloat("ClientRotW"),
+            PlayerPrefs.GetFloat("ClientRotX"),
+            PlayerPrefs.GetFloat("ClientRotY"),
+            PlayerPrefs.GetFloat("ClientRotZ")
+            );
+        health = PlayerPrefs.GetInt("ClientHealth");;
         startingHealth = health;
         characterController = GetComponent<CharacterController>();
-        this.clientLayer = clientLayer;
-
+        //this.clientLayer = clientLayer;
         currentSpeed = walkingSpeed;
-
-        this.isFirstClient = isFirstClient; // TODO DELETE
-
-        if (isFirstClient)
-        {
-            cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
-            raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
-            icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
         
-            StartCoroutine ("SpawnWeaponUponStart");
-        }
+        InitializeConnectedPlayers();
+        
+        /* FPS variables */
+        cameraMain = GameObject.FindGameObjectWithTag("MainCamera").transform;
+        raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
+        icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
+        StartCoroutine ("SpawnWeaponUponStart");
     }
-    
-    private IEnumerator SpawnWeaponUponStart() {
-        yield return new WaitForSeconds (0.5f);
-        if (weaponChanging)
-            weaponChanging.Play ();
+
+    private void InitializeConnectedPlayers()
+    {
+        var connectedPlayerCount = PlayerPrefs.GetInt("ConnectedPlayerCount");
         
-        var resource = (GameObject) Resources.Load("Gun");
-        gun = Instantiate(resource, transform.position, Quaternion.identity, transform);
-        gun.layer = transform.gameObject.layer;
-        handsAnimator = gun.GetComponent<GunManager>().handsAnimator;
+        for (var i = 1; i <= connectedPlayerCount; i++)
+        {
+            var connectedPlayerId = PlayerPrefs.GetInt($"ConnectedPlayer{i}Id");
+            var position = new Vector3();
+            var rotation = new Quaternion();
+
+            position.x = PlayerPrefs.GetFloat($"ConnectedPlayer{i}PosX");
+            position.y = PlayerPrefs.GetFloat($"ConnectedPlayer{i}PosY");
+            position.z = PlayerPrefs.GetFloat($"ConnectedPlayer{i}PosZ");
+            rotation.w = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotW");
+            rotation.x = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotX");
+            rotation.y = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotY");
+            rotation.z = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotZ");
+            
+            InitializeConnectedPlayer(connectedPlayerId, position, rotation);
+        }
     }
 
     private void FixedUpdate()
@@ -151,6 +168,17 @@ public class ClientEntity : MonoBehaviour
             if (interpolationBuffer.Count < 2)
                 isPlaying = false;
         }
+    }
+    
+    private IEnumerator SpawnWeaponUponStart() {
+        yield return new WaitForSeconds (0.5f);
+        if (weaponChanging)
+            weaponChanging.Play ();
+        
+        var resource = (GameObject) Resources.Load("Gun");
+        gun = Instantiate(resource, transform.position, Quaternion.identity, transform);
+        gun.layer = transform.gameObject.layer;
+        handsAnimator = gun.GetComponent<GunManager>().handsAnimator;
     }
 
     // Update 'commandsToSend' variable if new input is read
@@ -410,10 +438,10 @@ public class ClientEntity : MonoBehaviour
     {
         var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation, transform);
         newClient.name = $"{connectedPlayerId}";
-        newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");
+        //newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");  // TODO CHANGE LAYER
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
-        newClient.GetComponent<Renderer>().material.color = clientColor;
+        //newClient.GetComponent<Renderer>().material.color = clientColor;
         
         otherPlayers.Add(connectedPlayerId, newClient.GetComponent<ClientCopyEntity>());
     }

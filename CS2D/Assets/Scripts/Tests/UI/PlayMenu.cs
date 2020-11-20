@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class PlayMenu : MonoBehaviour
 {
     public GameObject title;
     public GameObject mainMenu;
     public GameObject playMenu;
+    public ConnectionManager connectionManager;
+
+    public Button[] actionButtons;
 
     public TMP_InputField playerNameInput;
     public TMP_InputField gameIpInput;
@@ -29,15 +33,24 @@ public class PlayMenu : MonoBehaviour
     public void JoinGame()
     {
         SavePlayerPrefs();
-        SceneManager.LoadScene("Client Game");
+        BlockActions();
+        connectionManager.InitializePlayerConnection();
     }
-    
+
+    private void BlockActions()
+    {
+        foreach (var btn in actionButtons)
+        {
+            btn.interactable = false;
+        }
+    }
+
     private void SavePlayerPrefs()
     {
         var playerName = playerNameInput.text;
         var ip = gameIpInput.text;
         PlayerPrefs.SetString("PlayerName", string.IsNullOrWhiteSpace(playerName)? "Player" : playerName);
-        PlayerPrefs.SetString("ServerIP", string.IsNullOrWhiteSpace(ip)? "127.0.0.1" : ip);
+        PlayerPrefs.SetString("ServerIp", string.IsNullOrWhiteSpace(ip)? "127.0.0.1" : ip);
         PlayerPrefs.Save();
     }
 }

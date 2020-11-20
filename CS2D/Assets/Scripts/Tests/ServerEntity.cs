@@ -25,7 +25,7 @@ public class ServerEntity : MonoBehaviour
     
     private const int PortsPerClient = 2;
     private const int ClientBasePort = 9010;
-    
+    public const int MaxClientCount = 10; // TODO IMPLEMENT LIMIT FAILURE
     public int clientCount = 0;
     private const float PlayerJoinedTimeout = 1f;
     public int minInterpolationBufferElems = 2;
@@ -47,7 +47,7 @@ public class ServerEntity : MonoBehaviour
 
     // Start is called before the first frame update
     private void Awake() {
-        serverIp = PlayerPrefs.GetString("ServerIP", "127.0.0.1");
+        serverIp = PlayerPrefs.GetString("ServerIp", "127.0.0.1");
         connectionChannel = new Channel(ServerPort);
         connectionIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), ConnectionPort);
         

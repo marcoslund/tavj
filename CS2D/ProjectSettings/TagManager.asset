@@ -12,6 +12,7 @@ TagManager:
   - RaySpawn
   - Weapon
   - ClientController
+  - ClientEntity
   layers:
   - Default
   - TransparentFX
