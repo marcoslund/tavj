@@ -1,14 +1,15 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Net;
 using Tests;
 using UnityEngine;
 
 public class ClientData
 {
-    private int sendPort;
-    private Channel sendChannel;
-    private int recvPort;
-    private Channel recvChannel;
+    private int clientPort;
+    private int serverPort;
+    private Channel channel;
+    private IPEndPoint clientIpEndPoint;
 
     private Dictionary<int, float> playerJoinedTimeouts = new Dictionary<int, float>();
     
@@ -20,28 +21,28 @@ public class ClientData
     private CharacterController controller;
     private float yVelocity;
 
-    public int SendPort
+    public int ClientPort
     {
-        get => sendPort;
-        set => sendPort = value;
+        get => clientPort;
+        set => clientPort = value;
     }
 
-    public Channel SendChannel
+    public int ServerPort
     {
-        get => sendChannel;
-        set => sendChannel = value;
+        get => serverPort;
+        set => serverPort = value;
     }
 
-    public int RecvPort
+    public Channel Channel
     {
-        get => recvPort;
-        set => recvPort = value;
+        get => channel;
+        set => channel = value;
     }
 
-    public Channel RecvChannel
+    public IPEndPoint ClientIpEndPoint
     {
-        get => recvChannel;
-        set => recvChannel = value;
+        get => clientIpEndPoint;
+        set => clientIpEndPoint = value;
     }
 
     public Dictionary<int, float> PlayerJoinedTimeouts

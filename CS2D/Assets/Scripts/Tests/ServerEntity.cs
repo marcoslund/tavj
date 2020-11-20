@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +16,6 @@ public class ServerEntity : MonoBehaviour
     public GameObject cubePrefab;
     
     [HideInInspector] public Dictionary<int, ClientData> clients = new Dictionary<int, ClientData>();
-    
     
     private const int ServerPort = 9000;
     private const int ConnectionPort = 9001;
@@ -37,7 +36,6 @@ public class ServerEntity : MonoBehaviour
     public float serverTime = 0;
     public int nextSnapshotSeq = 0; // Next snapshot to send
     
-    private bool serverConnected = true;
     public List<Transform> spawnPoints;
     private readonly Color serverCubesColor = Color.white;
 
@@ -46,8 +44,6 @@ public class ServerEntity : MonoBehaviour
 
     private const int FullPlayerHealth = 100;
     private const int ShotDamage = 10;
-
-    public bool capsulesOn = false;
 
     // Start is called before the first frame update
     private void Awake() {
@@ -60,17 +56,8 @@ public class ServerEntity : MonoBehaviour
 
     // Update is called once per frame
     private void Update() {
-        /*if (Input.GetKeyDown(KeyCode.D))
-        {
-            serverConnected = !serverConnected;
-        }*/
-
         sendSnapshotAccum += Time.deltaTime;
-
-        if (serverConnected)
-        {
-            UpdateServer();
-        }
+        UpdateServer();
     }
 
     private void FixedUpdate()
@@ -96,20 +83,20 @@ public class ServerEntity : MonoBehaviour
             var clientData = clientDataPair.Value;
             
             // Deserialize packets for each client
-            var packet = clientData.RecvChannel.GetPacket();
+            var packet = clientData.Channel.GetPacket();
             
             while (packet != null) {
                 var buffer = packet.buffer;
                 DeserializeClientMessage(buffer, clientId);
-                packet = clientData.RecvChannel.GetPacket();
+                packet = clientData.Channel.GetPacket();
             }
         }
         
         if (sendSnapshotAccum >= sendRate) // Check if snapshot must be sent
         {
-            foreach (var clientId in clients.Keys)
+            foreach (var clientDataPair in clients)
             {
-                SendSnapshotToClient(clientId);
+                SendSnapshotToClient(clientDataPair.Key, clientDataPair.Value);
             }
             sendSnapshotAccum -= sendRate;
             nextSnapshotSeq++;
@@ -129,8 +116,7 @@ public class ServerEntity : MonoBehaviour
                 {
                     var timeoutClientId = timeoutPair.Key;
                     var timeoutClientData = clients[timeoutClientId];
-                    SendPlayerJoined(timeoutClientData.SendPort, timeoutClientData.SendChannel, connectedPlayerId, 
-                        clientData.Controller.transform);
+                    SendPlayerJoined(timeoutClientData, connectedPlayerId, clientData.Controller.transform);
                     clientData.PlayerJoinedTimeouts[timeoutClientId] = PlayerJoinedTimeout;
                 }
             }
@@ -176,16 +162,14 @@ public class ServerEntity : MonoBehaviour
         clients[clientId].YVelocity = velocity;
     }
 
-    private void SendSnapshotToClient(int clientId)
+    private void SendSnapshotToClient(int clientId, ClientData clientData)
     {
         var packet = Packet.Obtain();
         
         ServerSerializationManager.ServerWorldSerialize(packet.buffer, nextSnapshotSeq, serverTime, clientId, clients);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), clients[clientId].SendPort);
-        clients[clientId].SendChannel.Send(packet, remoteEp);
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
 
         packet.Free();
     }
@@ -207,16 +191,15 @@ public class ServerEntity : MonoBehaviour
         CharacterController controller = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
         clientData.Controller = controller;
         controller.GetComponent<Renderer>().material.color = serverCubesColor;
-        if (!capsulesOn)
-            controller.GetComponent<Renderer>().enabled = false;
+        controller.GetComponent<Renderer>().enabled = true;
 
         // Setup client ports & channels
-        var clientSendPort = ClientBasePort + clientCount * PortsPerClient;
-        var clientRecvPort = ClientBasePort + clientCount * PortsPerClient + 1;
-        clientData.RecvPort = clientSendPort;
-        clientData.SendPort = clientRecvPort;
-        clientData.RecvChannel = new Channel(clientSendPort);
-        clientData.SendChannel = new Channel(clientRecvPort);
+        var serverPort = ClientBasePort + clientCount * PortsPerClient;
+        var clientPort = ClientBasePort + clientCount * PortsPerClient + 1;
+        clientData.ServerPort = serverPort;
+        clientData.ClientPort = clientPort;
+        clientData.Channel = new Channel(serverPort);
+        clientData.ClientIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), clientPort);
         
         // Setup client transform data
         var clientTransform = controller.transform;
@@ -236,7 +219,7 @@ public class ServerEntity : MonoBehaviour
             var data = client.Value;
             if (clientId != newClientId)
             {
-                SendPlayerJoined(data.SendPort, data.SendChannel, newClientId, clientTransform);
+                SendPlayerJoined(data, newClientId, clientTransform);
                 clientData.PlayerJoinedTimeouts.Add(clientId, PlayerJoinedTimeout);
             }
         }
@@ -266,17 +249,15 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void SendPlayerJoined(int clientPort, Channel clientChannel, int newUserId, Transform newClientTransform)
+    private static void SendPlayerJoined(ClientData clientData, int newUserId, Transform newClientTransform)
     {
         var packet = Packet.Obtain();
         ServerSerializationManager.SerializePlayerJoined(packet.buffer, newUserId, newClientTransform.position, 
             newClientTransform.rotation);
         packet.buffer.Flush();
-
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), clientPort);
-        clientChannel.Send(packet, remoteEp);
-
+        
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
+        
         packet.Free();
     }
 
@@ -345,9 +326,7 @@ public class ServerEntity : MonoBehaviour
         ServerSerializationManager.ServerSerializeCommandAck(packet.buffer, receivedCommandSequence);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), clientData.SendPort);
-        clientData.SendChannel.Send(packet, remoteEp);
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
 
         packet.Free();
     }
@@ -400,7 +379,7 @@ public class ServerEntity : MonoBehaviour
                 var clientData = clientPair.Value;
                 if (clientId != shooterId)
                 {
-                    SendPlayerShotBroadcast(clientData.SendPort, clientData.SendChannel, shooterId, shot.ShotPlayerId);
+                    SendPlayerShotBroadcast(clientData, shooterId, shot.ShotPlayerId);
                 }
             }
         }
@@ -409,22 +388,18 @@ public class ServerEntity : MonoBehaviour
         ServerSerializationManager.ServerSerializeShotAck(packet.buffer, recvShotSequence);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), shooterData.SendPort);
-        shooterData.SendChannel.Send(packet, remoteEp);
+        shooterData.Channel.Send(packet, shooterData.ClientIpEndPoint);
 
         packet.Free();
     }
 
-    private void SendPlayerShotBroadcast(int port, Channel channel, int shooterId, int shotPlayerId)
+    private void SendPlayerShotBroadcast(ClientData clientData, int shooterId, int shotPlayerId)
     {
         var packet = Packet.Obtain();
         ServerSerializationManager.SerializePlayerShotBroadcast(packet.buffer, shooterId, shotPlayerId);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), port);
-        channel.Send(packet, remoteEp);
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
 
         packet.Free();
     }

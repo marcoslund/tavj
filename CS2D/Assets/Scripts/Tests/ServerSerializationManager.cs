@@ -42,8 +42,8 @@ public static class ServerSerializationManager
         
         buffer.PutByte((int) PacketType.PlayerJoinedResponse);
         buffer.PutInt(newUserId);
-        buffer.PutInt(clientData.RecvPort);
-        buffer.PutInt(clientData.SendPort);
+        buffer.PutInt(clientData.ClientPort);
+        buffer.PutInt(clientData.ServerPort);
         buffer.PutFloat(serverTime);
         buffer.PutInt(nextSnapshotSeq);
         buffer.PutByte(minInterpolationBufferElems);

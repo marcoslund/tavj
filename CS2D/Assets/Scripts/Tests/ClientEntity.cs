@@ -8,10 +8,10 @@ using UnityEngine;
 
 public class ClientEntity : MonoBehaviour
 {
-    public int sendPort;
-    public int recvPort;
-    //public Channel sendChannel;
-    //public Channel recvChannel;
+    public int clientPort;
+    public int serverPort;
+    private Channel channel;
+    private IPEndPoint serverIpEndPoint;
 
     public int clientId;
     public int displaySeq = 0; // Current min frame being used for interpolation
@@ -21,29 +21,25 @@ public class ClientEntity : MonoBehaviour
     public List<Snapshot> interpolationBuffer = new List<Snapshot>();
     public int minInterpolationBufferElems;
 
-    private Commands commandsToSend = new Commands();
+    private readonly Commands commandsToSend = new Commands();
     public List<Commands> unAckedCommands = new List<Commands>();
-    private List<Commands> predictionCommands = new List<Commands>();
+    private readonly List<Commands> predictionCommands = new List<Commands>();
 
-    private Dictionary<int, ClientCopyEntity> otherPlayers = new Dictionary<int, ClientCopyEntity>();
+    private readonly Dictionary<int, ClientCopyEntity> otherPlayers = new Dictionary<int, ClientCopyEntity>();
     private Color clientColor;
 
-    private CharacterController _characterController;
+    private CharacterController characterController;
     private int clientLayer;
     [HideInInspector] public float currentSpeed;
-    public float walkingSpeed = 5.0f;
-    /*public float jumpHeight = 1.0f;
-    public float jumpSpeed = 10.0f;*/
+    
+    public float walkingSpeed = 5.0f; // TODO HARDCODED, RECV FROM SERVER
     public float gravityValue = -9.81f;
     private float velocityY;
 
     private int shotSeq = 1;
     public List<Shot> unAckedShots = new List<Shot>();
     public int health;
-    
-    private ClientManager clientManager;
-    private Channel channel;
-    
+
     [HideInInspector] public Transform cameraMain;
     [HideInInspector] public Vector3 cameraPosition;
     [HideInInspector] public Transform raySpawn;
@@ -56,31 +52,30 @@ public class ClientEntity : MonoBehaviour
 
     private bool isFirstClient;
 
-    public void InitializeClientEntity(int sendPort, int recvPort, int clientId, float clientTime, int displaySeq, 
+    public void InitializeClientEntity(int clientPort, string serverIp, int serverPort, int clientId, float clientTime, int displaySeq, 
         int minInterpolationBufferElems, Color clientColor, Vector3 position, Quaternion rotation, int health, int clientLayer, 
-        ClientManager clientManager, bool isFirstClient)
+        bool isFirstClient)
     {
-        this.sendPort = sendPort;
-        //sendChannel = new Channel(sendPort);
-        this.recvPort = recvPort;
-        //recvChannel = new Channel(recvPort);
+        this.clientPort = clientPort;
+        this.serverPort = serverPort;
+        channel = new Channel(clientPort);
+        serverIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPort);
+        
         this.clientId = clientId;
         this.clientTime = clientTime;
         this.displaySeq = displaySeq;
         this.minInterpolationBufferElems = minInterpolationBufferElems;
+        
         this.clientColor = clientColor;
         var rend = GetComponent<Renderer>();
         rend.material.color = clientColor;
         transform.position = position;
         transform.rotation = rotation;
         this.health = health;
-        _characterController = GetComponent<CharacterController>();
+        characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
-        this.clientManager = clientManager;
 
         currentSpeed = walkingSpeed;
-
-        channel = clientManager.serverEntity.clients[clientId].SendChannel; // TODO DELETE
 
         this.isFirstClient = isFirstClient; // TODO DELETE
 
@@ -313,13 +308,13 @@ public class ClientEntity : MonoBehaviour
             transform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
             move = transform.TransformDirection(move);
             
-            if (!_characterController.isGrounded)
+            if (!characterController.isGrounded)
             {
                 recvVelY += gravityValue * Time.fixedDeltaTime;
                 move.y = velocityY * Time.fixedDeltaTime;
             }
             
-            _characterController.Move(move);
+            characterController.Move(move);
         }
         velocityY = recvVelY;
         transform.rotation = Quaternion.Euler(0, currentRotationY, 0);
@@ -334,7 +329,7 @@ public class ClientEntity : MonoBehaviour
         move.z = commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
         move = transform.TransformDirection(move);
         
-        if (!_characterController.isGrounded)
+        if (!characterController.isGrounded)
         {
             velocityY += gravityValue * Time.fixedDeltaTime;
             move.y = velocityY * Time.fixedDeltaTime;
@@ -353,7 +348,7 @@ public class ClientEntity : MonoBehaviour
             canJump = false;
         }*/
         
-        _characterController.Move(move);
+        characterController.Move(move);
 
         return move;
     }
@@ -365,14 +360,12 @@ public class ClientEntity : MonoBehaviour
         ClientSerializationManager.SerializeCommands(packet.buffer, commandsList, clientId);
         packet.buffer.Flush();
 
-        var serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp);
+        channel.Send(packet, serverIpEndPoint);
 
         packet.Free();
     }
 
-    private int DeserializeCommandAck(BitBuffer buffer)
+    private static int DeserializeCommandAck(BitBuffer buffer)
     {
         return buffer.GetInt();
     }
@@ -429,16 +422,13 @@ public class ClientEntity : MonoBehaviour
         ClientSerializationManager.SerializePlayerJoinedAck(packet.buffer, newPlayerId, clientId);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
+        channel.Send(packet, serverIpEndPoint);
 
         packet.Free();
     }
 
     private void OnDestroy() {
-        //sendChannel.Disconnect();
-        //recvChannel.Disconnect();
+        channel.Disconnect();
     }
 
     public void SendPlayerShotMessage(string shotPlayerIdStr)
@@ -451,9 +441,7 @@ public class ClientEntity : MonoBehaviour
         ClientSerializationManager.SerializePlayerShot(packet.buffer, unAckedShots, clientId);
         packet.buffer.Flush();
 
-        string serverIP = "127.0.0.1";
-        var remoteEp = new IPEndPoint(IPAddress.Parse(serverIP), sendPort);
-        clientManager.serverEntity.clients[clientId].RecvChannel.Send(packet, remoteEp);//sendChannel.Send(packet, remoteEp); // TODO FIX
+        channel.Send(packet, serverIpEndPoint);
 
         packet.Free();
     }

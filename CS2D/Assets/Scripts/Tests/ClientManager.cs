@@ -13,8 +13,6 @@ public class ClientManager : MonoBehaviour
     private Channel channel;
     private string serverIp;
     private IPEndPoint serverIpEndPoint;
-    
-    public ServerEntity serverEntity; // TODO DELETE
 
     private int clientCounter = 0;
     private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>();
@@ -120,12 +118,12 @@ public class ClientManager : MonoBehaviour
         var newClient = Instantiate(cubePrefab, transform);
         newClient.name = $"Client-{clientId}";
         newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}");
-        if (!serverEntity.capsulesOn) newClient.GetComponent<Renderer>().enabled = false;
+        newClient.GetComponent<Renderer>().enabled = false;
     
         var clientEntity = newClient.AddComponent<ClientEntity>();
     
-        var sendPort = buffer.GetInt();
-        var recvPort = buffer.GetInt();
+        var clientPort = buffer.GetInt();
+        var serverPort = buffer.GetInt();
         var clientTime = buffer.GetFloat();
         var displaySeq = buffer.GetInt();
         var minBufferElems = buffer.GetByte();
@@ -144,8 +142,8 @@ public class ClientManager : MonoBehaviour
     
         var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
     
-        clientEntity.InitializeClientEntity(sendPort, recvPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
-            position, rotation, health, usedClientLayersCount, this, !createdFirstPlayer);
+        clientEntity.InitializeClientEntity(clientPort, serverIp, serverPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
+            position, rotation, health, usedClientLayersCount, !createdFirstPlayer);
         usedClientLayersCount++;
 
         InitializeOtherPlayerCopies(buffer, clientId, clientEntity);
