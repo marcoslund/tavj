@@ -11,7 +11,6 @@ public static class ServerSerializationManager
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
-        buffer.PutInt(clientData.Health);
         buffer.PutInt(clientData.RecvCommandSeq);
         buffer.PutFloat(clientData.YVelocity);
         buffer.PutByte(clients.Count);
@@ -103,10 +102,11 @@ public static class ServerSerializationManager
         buffer.PutInt(shotSequence);
     }
     
-    public static void SerializePlayerShotBroadcast(BitBuffer buffer, int shooterId, int shotPlayerId)
+    public static void SerializePlayerShotBroadcast(BitBuffer buffer, int shooterId, int shotPlayerId, int health)
     {
         buffer.PutByte((int) PacketType.PlayerShotBroadcast);
         buffer.PutInt(shooterId);
         buffer.PutInt(shotPlayerId);
+        buffer.PutInt(health);
     }
 }

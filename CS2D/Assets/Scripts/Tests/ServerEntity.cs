@@ -369,8 +369,8 @@ public class ServerEntity : MonoBehaviour
         foreach (var shot in shotsList)
         {
             recvShotSequence = shot.Seq;
-
-            clients[shot.ShotPlayerId].Health -= ShotDamage;
+            var shotPlayerData = clients[shot.ShotPlayerId];
+            shotPlayerData.Health -= ShotDamage;
             // CHECK IF DEAD...
             
             foreach (var clientPair in clients)
@@ -379,7 +379,7 @@ public class ServerEntity : MonoBehaviour
                 var clientData = clientPair.Value;
                 if (clientId != shooterId)
                 {
-                    SendPlayerShotBroadcast(clientData, shooterId, shot.ShotPlayerId);
+                    SendPlayerShotBroadcast(clientData, shooterId, shot.ShotPlayerId, shotPlayerData.Health);
                 }
             }
         }
@@ -393,10 +393,10 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void SendPlayerShotBroadcast(ClientData clientData, int shooterId, int shotPlayerId)
+    private void SendPlayerShotBroadcast(ClientData clientData, int shooterId, int shotPlayerId, int health)
     {
         var packet = Packet.Obtain();
-        ServerSerializationManager.SerializePlayerShotBroadcast(packet.buffer, shooterId, shotPlayerId);
+        ServerSerializationManager.SerializePlayerShotBroadcast(packet.buffer, shooterId, shotPlayerId, health);
         packet.buffer.Flush();
 
         clientData.Channel.Send(packet, clientData.ClientIpEndPoint);

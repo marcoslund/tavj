@@ -39,6 +39,8 @@ public class ClientEntity : MonoBehaviour
     private int shotSeq = 1;
     public List<Shot> unAckedShots = new List<Shot>();
     public int health;
+    private int startingHealth;
+    public PlayerHealth playerHealthManager;
 
     [HideInInspector] public Transform cameraMain;
     [HideInInspector] public Vector3 cameraPosition;
@@ -72,6 +74,7 @@ public class ClientEntity : MonoBehaviour
         transform.position = position;
         transform.rotation = rotation;
         this.health = health;
+        startingHealth = health;
         characterController = GetComponent<CharacterController>();
         this.clientLayer = clientLayer;
 
@@ -228,7 +231,7 @@ public class ClientEntity : MonoBehaviour
                 RemoveAckedShots(rcvdShotSequence);
                 break;
             case PacketType.PlayerShotBroadcast:
-                // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
+                DeserializeShotBroadcast(buffer);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -242,7 +245,6 @@ public class ClientEntity : MonoBehaviour
         if (recvFrameSeq < displaySeq) return; // Check if received snapshot is old
         
         var time = buffer.GetFloat();
-        health = buffer.GetInt();
         var recvCmdSeq = buffer.GetInt();
         var recvVelY = buffer.GetFloat();
         var playerCount = buffer.GetByte();
@@ -461,5 +463,20 @@ public class ClientEntity : MonoBehaviour
             lastAckedShotIndex++;
         }
         unAckedShots.RemoveRange(0, lastAckedShotIndex);
+    }
+    
+    private void DeserializeShotBroadcast(BitBuffer buffer)
+    {
+        var shooterId = buffer.GetInt();
+        var shotPlayerId = buffer.GetInt();
+        var shotPlayerHealth = buffer.GetInt();
+
+        if (shotPlayerId == clientId)
+        {
+            health = shotPlayerHealth;
+            playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
+        }
+        
+        // TODO SHOW SHOOTING (& DEATH) ANIMATION & BLOOD, SEND ACK
     }
 }
