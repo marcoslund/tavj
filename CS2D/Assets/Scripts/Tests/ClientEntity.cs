@@ -25,7 +25,7 @@ public class ClientEntity : MonoBehaviour
     public List<Commands> unAckedCommands = new List<Commands>();
     private readonly List<Commands> predictionCommands = new List<Commands>();
 
-    private readonly Dictionary<int, ClientCopyEntity> otherPlayers = new Dictionary<int, ClientCopyEntity>();
+    private readonly Dictionary<int, PlayerCopyManager> otherPlayers = new Dictionary<int, PlayerCopyManager>();
     //private Color clientColor;
 
     private CharacterController characterController;
@@ -454,7 +454,7 @@ public class ClientEntity : MonoBehaviour
         newClient.transform.rotation = rotation;
         //newClient.GetComponent<Renderer>().material.color = clientColor;
         
-        otherPlayers.Add(connectedPlayerId, newClient.GetComponent<ClientCopyEntity>());
+        otherPlayers.Add(connectedPlayerId, newClient.GetComponent<PlayerCopyManager>());
     }
     
     private void SendPlayerJoinedAck(int newPlayerId)

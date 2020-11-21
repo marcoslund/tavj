@@ -21,6 +21,8 @@ public class ClientData
     private CharacterController controller;
     private float yVelocity;
 
+    private PlayerCopyManager playerCopyManager;
+
     public int ClientPort
     {
         get => clientPort;
@@ -85,5 +87,11 @@ public class ClientData
     {
         get => yVelocity;
         set => yVelocity = value;
+    }
+
+    public PlayerCopyManager PlayerCopyManager
+    {
+        get => playerCopyManager;
+        set => playerCopyManager = value;
     }
 }

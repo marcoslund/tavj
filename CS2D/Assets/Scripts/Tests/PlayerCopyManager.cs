@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ClientCopyEntity : MonoBehaviour
+public class PlayerCopyManager : MonoBehaviour
 {
     public Animator animator;
-    private const float Epsilon = 0.001f;
+    private const float Epsilon = 0.0001f;
 
     // Start is called before the first frame update
     void Start()
@@ -27,11 +27,11 @@ public class ClientCopyEntity : MonoBehaviour
         transf.rotation = rotation;
     }
 
-    private void SetAnimatorMovementParameters(Vector3 delta)
+    public void SetAnimatorMovementParameters(Vector3 delta)
     {
         var deltaX = delta.x;
         var deltaZ = delta.z;
-        //Debug.Log(deltaX + " " + deltaZ);
+        Debug.Log(deltaX + " " + deltaZ);
 
         if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
         else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);

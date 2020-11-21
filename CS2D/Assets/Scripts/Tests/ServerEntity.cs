@@ -66,7 +66,11 @@ public class ServerEntity : MonoBehaviour
         {
             var clientId = client.Key;
             var clientData = client.Value;
+            var transf = clientData.Controller.transform;
+            var toUpdatePos = transf.position;
             MovePlayer(clientId, clientData.Controller, clientData.YVelocity, clientData.RecvCommands);
+            var updatedPos = transf.position;
+            clientData.PlayerCopyManager.SetAnimatorMovementParameters(toUpdatePos - updatedPos);
         }
     }
 
@@ -190,8 +194,9 @@ public class ServerEntity : MonoBehaviour
         // Instantiate client character controller
         CharacterController controller = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
         clientData.Controller = controller;
-        controller.GetComponent<Renderer>().material.color = serverCubesColor;
-        controller.GetComponent<Renderer>().enabled = true;
+        //controller.GetComponent<Renderer>().material.color = serverCubesColor;
+        //controller.GetComponent<Renderer>().enabled = true;
+        clientData.PlayerCopyManager = controller.GetComponent<PlayerCopyManager>();
 
         // Setup client ports & channels
         var serverPort = ClientBasePort + clientCount * PortsPerClient;
