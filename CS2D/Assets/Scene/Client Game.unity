@@ -20313,7 +20313,6 @@ MonoBehaviour:
   walkingSpeed: 5
   gravityValue: -9.81
   health: 0
-  playerHealthManager: {fileID: 0}
   cameraMain: {fileID: 0}
   cameraPosition: {x: 0, y: 0, z: 0}
   raySpawn: {fileID: 0}
@@ -20321,6 +20320,19 @@ MonoBehaviour:
   handsAnimator: {fileID: 0}
   icon: {fileID: 0}
   weaponChanging: {fileID: 0}
+--- !u!114 &1507652251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1507652244}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 473578f6a8f28cf4fb0c2b15280b23fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  healthSlider: {fileID: 578599326}
 --- !u!1 &1508509149 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100000, guid: 99e34173a1713384990b39fd17d258c2,
