@@ -11,4 +11,9 @@ public class PlayerHealth : MonoBehaviour
     {
         healthSlider.value = value;
     }
+
+    public void TogglePlayerHealth()
+    {
+        healthSlider.gameObject.SetActive(!healthSlider.gameObject.activeSelf);
+    }
 }

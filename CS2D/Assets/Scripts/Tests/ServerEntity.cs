@@ -375,12 +375,8 @@ public class ServerEntity : MonoBehaviour
             
             foreach (var clientPair in clients)
             {
-                var clientId = clientPair.Key;
                 var clientData = clientPair.Value;
-                if (clientId != shooterId)
-                {
-                    SendPlayerShotBroadcast(clientData, shooterId, shot.ShotPlayerId, shotPlayerData.Health);
-                }
+                SendPlayerShotBroadcast(clientData, shooterId, shot.ShotPlayerId, shotPlayerData.Health);
             }
         }
         

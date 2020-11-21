@@ -40,7 +40,8 @@ public class ClientEntity : MonoBehaviour
     public List<Shot> unAckedShots = new List<Shot>();
     public int health;
     private int startingHealth;
-    private PlayerHealth _playerHealthManager;
+    private PlayerHealth playerHealthManager;
+    [HideInInspector] public bool playerDead;
 
     [HideInInspector] public Transform cameraMain;
     [HideInInspector] public Vector3 cameraPosition;
@@ -51,6 +52,12 @@ public class ClientEntity : MonoBehaviour
     public Texture icon;
     
     public AudioSource weaponChanging;
+
+    public GameObject thirdPersonModel;
+    private Animator thirdPersonAnimator;
+    private Vector3 deathCameraPosition = new Vector3(0, 2, -2);
+    private float deathCameraRotationX = 35f;
+    private FirstPersonView firstPersonView;
 
     private void Awake()
     {
@@ -83,7 +90,7 @@ public class ClientEntity : MonoBehaviour
             );
         health = PlayerPrefs.GetInt("ClientHealth");;
         startingHealth = health;
-        _playerHealthManager = GetComponent<PlayerHealth>();
+        playerHealthManager = GetComponent<PlayerHealth>();
         characterController = GetComponent<CharacterController>();
         //this.clientLayer = clientLayer;
         currentSpeed = walkingSpeed;
@@ -95,6 +102,9 @@ public class ClientEntity : MonoBehaviour
         raySpawn = GameObject.FindGameObjectWithTag("RaySpawn").transform;
         icon = (Texture) Resources.Load("Weap_Icons/NewGun_auto_img");
         StartCoroutine ("SpawnWeaponUponStart");
+
+        thirdPersonAnimator = thirdPersonModel.GetComponent<Animator>();
+        firstPersonView = GetComponent<FirstPersonView>();
     }
 
     private void InitializeConnectedPlayers()
@@ -183,6 +193,8 @@ public class ClientEntity : MonoBehaviour
     // Update 'commandsToSend' variable if new input is read
     private void ReadInput()
     {
+        if (playerDead) return;
+        
         if (Input.GetKeyDown(KeyCode.W))
             commandsToSend.Up = true;
         else if (Input.GetKeyUp(KeyCode.W) || (commandsToSend.Up && !Input.GetKey(KeyCode.W))) // TODO DELETE SECOND CHECK
@@ -501,8 +513,42 @@ public class ClientEntity : MonoBehaviour
         if (shotPlayerId == clientId)
         {
             health = shotPlayerHealth;
-            _playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
+            playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
+            if (health <= 0)
+            {
+                StartCoroutine(ShowDeathAnimation());
+            }
+        } else if (shotPlayerHealth <= 0)
+        {
+            otherPlayers[shotPlayerId].TriggerDeathAnimation();
         }
-        // TODO SHOW SHOOTING (& DEATH) ANIMATION & BLOOD, SEND ACK
+        // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
+    }
+
+    private IEnumerator ShowDeathAnimation()
+    {
+        playerDead = true;
+        gun.SetActive(false);
+        firstPersonView.enabled = false;
+        playerHealthManager.TogglePlayerHealth();
+        thirdPersonModel.SetActive(true);
+        
+        var originalCameraPos = cameraMain.position;
+        var originalCameraRot = cameraMain.rotation.eulerAngles;
+        cameraMain.position = transform.TransformPoint(deathCameraPosition);
+        cameraMain.rotation = Quaternion.Euler(new Vector3(deathCameraRotationX, originalCameraRot.y, originalCameraRot.z));
+        
+        thirdPersonAnimator.SetTrigger("Dying");
+        
+        yield return new WaitForSeconds(6f);
+        
+        /*thirdPersonModel.SetActive(false);
+        gun.SetActive(true);
+        firstPersonView.enabled = true;
+        playerHealthManager.TogglePlayerHealth();
+
+        cameraMain.position = originalCameraPos;
+        //cameraMain.rotation = originalCameraRot;
+        playerDead = false;*/
     }
 }

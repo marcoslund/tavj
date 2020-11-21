@@ -39,6 +39,8 @@ public class FirstPersonView : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
+        if (clientEntity.playerDead) return;
+        
         MouseInputMovement();
         
         if(clientEntity.currentSpeed > 1)
@@ -63,6 +65,8 @@ public class FirstPersonView : MonoBehaviour
     }
 
     private void FixedUpdate() {
+        if (clientEntity.playerDead) return;
+        
         if(Input.GetAxis("Fire2") != 0) {
             mouseSensitivity = mouseSensitivity_aiming;
         }

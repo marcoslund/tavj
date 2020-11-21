@@ -5,7 +5,7 @@ using UnityEngine;
 public class ClientCopyEntity : MonoBehaviour
 {
     public Animator animator;
-    private const float Epsilon = 0.0001f;
+    private const float Epsilon = 0.001f;
 
     // Start is called before the first frame update
     void Start()
@@ -31,6 +31,7 @@ public class ClientCopyEntity : MonoBehaviour
     {
         var deltaX = delta.x;
         var deltaZ = delta.z;
+        //Debug.Log(deltaX + " " + deltaZ);
 
         if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
         else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
@@ -39,5 +40,10 @@ public class ClientCopyEntity : MonoBehaviour
         if(deltaZ > Epsilon) animator.SetFloat("Vertical Movement", 1);
         else if(deltaZ < -Epsilon) animator.SetFloat("Vertical Movement", -1);
         else animator.SetFloat("Vertical Movement", 0);
+    }
+
+    public void TriggerDeathAnimation()
+    {
+        animator.SetTrigger("Dying");
     }
 }

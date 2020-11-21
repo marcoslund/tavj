@@ -136,12 +136,14 @@ public class GunManager : MonoBehaviour
 		layerMask = LayerMask.GetMask(LayerMask.LayerToName(transform.gameObject.layer));
 	}
 
-	private void Update() {
+	private void Update()
+	{
+		if (clientEntity.playerDead) return;
+		
 		Animations();
 		PositionGun();
 		Shoot();
 		//Sprint();
-		//CrossHairExpansionWhenWalking();
 	}
 	
 	private void Animations()
@@ -199,7 +201,10 @@ public class GunManager : MonoBehaviour
 		expandValues_crosshair += new Vector2(6,12);
 	}
 
-	private void FixedUpdate() {
+	private void FixedUpdate()
+	{
+		if (clientEntity.playerDead) return;
+		
 		RotationGun ();
 		
 		if(Input.GetAxis("Fire2") != 0) {
@@ -237,28 +242,6 @@ public class GunManager : MonoBehaviour
 		transform.rotation = Quaternion.Euler (gunWeightX + (angularVelocityX * forwardRotationAmount.x), 
 			gunWeightY + (angularVelocityY * forwardRotationAmount.y), 0);
 	}
-
-	/*private void CrossHairExpansionWhenWalking() {
-		if(player.GetComponent<Rigidbody>().velocity.magnitude > 1 && Input.GetAxis("Fire1") == 0){//ifnot shooting
-
-			expandValues_crosshair += new Vector2(20, 40) * Time.deltaTime;
-			if(player.GetComponent<PlayerMovementScript>().maxSpeed < runningSpeed){ //not running
-				expandValues_crosshair = new Vector2(Mathf.Clamp(expandValues_crosshair.x, 0, 10), Mathf.Clamp(expandValues_crosshair.y,0,20));
-				fadeout_value = Mathf.Lerp(fadeout_value, 1, Time.deltaTime * 2);
-			}
-			else{//running
-				fadeout_value = Mathf.Lerp(fadeout_value, 0, Time.deltaTime * 10);
-				expandValues_crosshair = new Vector2(Mathf.Clamp(expandValues_crosshair.x, 0, 20), Mathf.Clamp(expandValues_crosshair.y,0,40));
-			}
-		}
-		else{//if shooting
-			expandValues_crosshair = Vector2.Lerp(expandValues_crosshair, Vector2.zero, Time.deltaTime * 5);
-			expandValues_crosshair = new Vector2(Mathf.Clamp(expandValues_crosshair.x, 0, 10), Mathf.Clamp(expandValues_crosshair.y,0,20));
-			fadeout_value = Mathf.Lerp(fadeout_value, 1, Time.deltaTime * 2);
-
-		}
-
-	}*/
 
 	/* 
 	 * Changes the max speed that player is allowed to go.
