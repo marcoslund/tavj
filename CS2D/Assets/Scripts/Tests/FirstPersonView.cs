@@ -43,7 +43,7 @@ public class FirstPersonView : MonoBehaviour
         
         MouseInputMovement();
         
-        if(clientEntity.currentSpeed > 1)
+        if(clientEntity.speed > 1)
             HeadMovement ();
     }
 

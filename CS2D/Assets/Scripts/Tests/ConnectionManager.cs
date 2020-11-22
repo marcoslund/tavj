@@ -14,8 +14,11 @@ public class ConnectionManager : MonoBehaviour
     private Channel channel;
     private string serverIp;
     private IPEndPoint serverIpEndPoint;
+
+    private int clientId;
+    private string clientName;
     
-    private readonly Dictionary<int, float> clientConnectionsTimeouts = new Dictionary<int, float>(); // TODO REMOVE DICTIONARY
+    private float connectionTimeoutTimer;
     private const float ClientConnectionTimeout = 1f;
     
     //public GameObject cubePrefab;
@@ -42,36 +45,34 @@ public class ConnectionManager : MonoBehaviour
         serverIp = PlayerPrefs.GetString("ServerIp", "127.0.0.1");
         serverIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), ServerPort);
         
-        var clientId = Random.Range(0, int.MaxValue); // Collisions are unlikely
-        SendClientConnection(clientId);
+        clientId = Random.Range(0, int.MaxValue); // Collisions are unlikely
+        clientName = PlayerPrefs.GetString("PlayerName");
+        SendClientConnection(clientId, clientName);
         Debug.Log("SENT CONNECTION REQUEST");
-        clientConnectionsTimeouts.Add(clientId, ClientConnectionTimeout);
+        
+        connectionTimeoutTimer = ClientConnectionTimeout;
     }
 
     private void UpdateConnectionTimeouts()
     {
-        var keys = clientConnectionsTimeouts.Keys.ToList();
-        foreach (var clientId in keys)
+        var remainingTime = connectionTimeoutTimer - Time.deltaTime;
+        // Check if timeout has been reached
+        if (remainingTime <= 0)
         {
-            var remainingTime = clientConnectionsTimeouts[clientId] - Time.deltaTime;
-            // Check if timeout has been reached
-            if (remainingTime <= 0)
-            {
-                SendClientConnection(clientId);
-                Debug.Log("SENT CONNECTION REQUEST");
-                clientConnectionsTimeouts[clientId] = ClientConnectionTimeout;
-            }
-            else
-            {
-                clientConnectionsTimeouts[clientId] = remainingTime;
-            }
+            SendClientConnection(clientId, clientName);
+            Debug.Log("SENT CONNECTION REQUEST");
+            connectionTimeoutTimer = ClientConnectionTimeout;
+        }
+        else
+        {
+            connectionTimeoutTimer = remainingTime;
         }
     }
 
-    private void SendClientConnection(int clientId)
+    private void SendClientConnection(int clientId, string clientName)
     {
         var packet = Packet.Obtain();
-        SerializeClientConnection(packet.buffer, clientId);
+        SerializeClientConnection(packet.buffer, clientId, clientName);
         packet.buffer.Flush();
 
         channel.Send(packet, serverIpEndPoint);
@@ -83,44 +84,30 @@ public class ConnectionManager : MonoBehaviour
      * Packet Type (byte)
      * Client ID (int)
      */
-    private static void SerializeClientConnection(BitBuffer buffer, int clientId) {
+    private static void SerializeClientConnection(BitBuffer buffer, int clientId, string clientName) {
         buffer.PutByte((int) PacketType.Join);
         buffer.PutInt(clientId);
+        buffer.PutString(clientName);
     }
     
     private void Deserialize(BitBuffer buffer)
     {
         var messageType = (PacketType) buffer.GetByte();
 
-        switch (messageType)
+        if (messageType == PacketType.PlayerJoinedResponse)
         {
-            case PacketType.PlayerJoinedResponse:
+            var recvClientId = buffer.GetInt();
+            if (recvClientId == clientId)
             {
-                var clientId = buffer.GetInt();
-                if (clientConnectionsTimeouts.ContainsKey(clientId))
-                {
-                    Debug.Log("RECV CONNECTION RESPONSE");
-                    SavePlayerAttributes(buffer, clientId);
-                    channel.Disconnect();
-                    SceneManager.LoadScene("Client Game");
-                }
-
-                break;
+                SavePlayerAttributes(buffer);
+                channel.Disconnect();
+                SceneManager.LoadScene("Client Game");
             }
         }
     }
 
-    private void SavePlayerAttributes(BitBuffer buffer, int clientId)
+    private void SavePlayerAttributes(BitBuffer buffer)
     {
-        clientConnectionsTimeouts.Remove(clientId);
-                
-        /*var newClient = Instantiate(cubePrefab, transform);
-        newClient.name = $"Client-{clientId}";
-        newClient.layer = LayerMask.NameToLayer($"Client {usedClientLayersCount}"); // TODO CHANGE LAYER
-        newClient.GetComponent<Renderer>().enabled = false;
-    
-        var clientEntity = newClient.AddComponent<ClientEntity>();*/ // TODO ADD PREFAB
-    
         var clientPort = buffer.GetInt();
         var serverPort = buffer.GetInt();
         var clientTime = buffer.GetFloat();
@@ -138,6 +125,8 @@ public class ConnectionManager : MonoBehaviour
         rotation.z = buffer.GetFloat();
 
         var health = buffer.GetInt();
+        var speed = buffer.GetFloat();
+        var gravity = buffer.GetFloat();
         
         PlayerPrefs.SetInt("ClientId", clientId);
         PlayerPrefs.SetInt("ClientPort", clientPort);
@@ -153,34 +142,23 @@ public class ConnectionManager : MonoBehaviour
         PlayerPrefs.SetFloat("ClientRotY", rotation.y);
         PlayerPrefs.SetFloat("ClientRotZ", rotation.z);
         PlayerPrefs.SetInt("ClientHealth", health);
-    
-        /*var clientColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
-    
-        clientEntity.InitializeClientEntity(clientPort, serverIp, serverPort, clientId, clientTime, displaySeq, minBufferElems, clientColor, 
-            position, rotation, health, usedClientLayersCount, !createdFirstPlayer);
-        usedClientLayersCount++;*/
+        PlayerPrefs.SetFloat("PlayerSpeed", speed);
+        PlayerPrefs.SetFloat("Gravity", gravity);
 
-        SaveConnectedPlayersAttributes(buffer/*, clientEntity*/);
-
-        /*if (!createdFirstPlayer)
-        {
-            firstPlayer = clientEntity.gameObject;
-            firstPlayer.AddComponent<FirstPersonView>(); // TODO ADD PREFAB
-            //firstPlayer.AddComponent<ShootManager>();
-            createdFirstPlayer = true;
-        }*/
+        SaveConnectedPlayersAttributes(buffer);
         
         PlayerPrefs.Save();
     }
 
-    private void SaveConnectedPlayersAttributes(BitBuffer buffer/*, ClientEntity clientEntity*/)
+    private void SaveConnectedPlayersAttributes(BitBuffer buffer)
     {
         var connectedPlayerCount = buffer.GetByte();
         PlayerPrefs.SetInt("ConnectedPlayerCount", connectedPlayerCount);
         
         for (var i = 1; i <= connectedPlayerCount; i++)
         {
-            var clientId = buffer.GetInt();
+            var otherClientId = buffer.GetInt();
+            var otherClientName = buffer.GetString();
             var position = new Vector3();
             var rotation = new Quaternion();
 
@@ -192,7 +170,8 @@ public class ConnectionManager : MonoBehaviour
             rotation.y = buffer.GetFloat();
             rotation.z = buffer.GetFloat();
             
-            PlayerPrefs.SetInt($"ConnectedPlayer{i}Id", clientId);
+            PlayerPrefs.SetInt($"ConnectedPlayer{i}Id", otherClientId);
+            PlayerPrefs.SetString($"ConnectedPlayer{i}Name", otherClientName);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}PosX", position.x);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}PosY", position.y);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}PosZ", position.z);
@@ -200,8 +179,6 @@ public class ConnectionManager : MonoBehaviour
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}RotX", rotation.x);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}RotY", rotation.y);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}RotZ", rotation.z);
-
-            //clientEntity.InitializeConnectedPlayer(clientId, position, rotation);
         }
     }
 }

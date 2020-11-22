@@ -35,7 +35,7 @@ public static class ServerSerializationManager
     
     public static void SerializePlayerJoinedResponse(BitBuffer buffer, int newUserId, Dictionary<int, ClientData> clients, 
         float serverTime, int nextSnapshotSeq, int minInterpolationBufferElems, Vector3 newClientPosition, 
-        Quaternion newClientRotation, int health, int clientCount)
+        Quaternion newClientRotation, int health, float speed, float gravity, int clientCount)
     {
         var clientData = clients[newUserId];
         
@@ -54,6 +54,8 @@ public static class ServerSerializationManager
         buffer.PutFloat(newClientRotation.y);
         buffer.PutFloat(newClientRotation.z);
         buffer.PutInt(health);
+        buffer.PutFloat(speed);
+        buffer.PutFloat(gravity);
         buffer.PutByte(clientCount - 1);
         foreach (var clientPair in clients)
         {
@@ -65,6 +67,7 @@ public static class ServerSerializationManager
                 var rotation = clientTransform.rotation;
                 
                 buffer.PutInt(clientId);
+                buffer.PutString(clientPair.Value.PlayerName);
                 buffer.PutFloat(position.x);
                 buffer.PutFloat(position.y);
                 buffer.PutFloat(position.z);
@@ -76,11 +79,12 @@ public static class ServerSerializationManager
         }
     }
     
-    public static void SerializePlayerJoined(BitBuffer buffer, int newUserId, Vector3 newClientPosition,
+    public static void SerializePlayerJoined(BitBuffer buffer, int newUserId, string newClientName, Vector3 newClientPosition,
         Quaternion newClientRotation)
     {
         buffer.PutByte((int) PacketType.PlayerJoined);
         buffer.PutInt(newUserId);
+        buffer.PutString(newClientName);
         buffer.PutFloat(newClientPosition.x);
         buffer.PutFloat(newClientPosition.y);
         buffer.PutFloat(newClientPosition.z);

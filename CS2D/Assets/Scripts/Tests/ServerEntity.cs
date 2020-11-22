@@ -37,7 +37,6 @@ public class ServerEntity : MonoBehaviour
     public int nextSnapshotSeq = 0; // Next snapshot to send
     
     public List<Transform> spawnPoints;
-    private readonly Color serverCubesColor = Color.white;
 
     private const float PlayerSpeed = 5.0f;
     private const float GravityValue = -9.81f;
@@ -121,7 +120,7 @@ public class ServerEntity : MonoBehaviour
                 {
                     var timeoutClientId = timeoutPair.Key;
                     var timeoutClientData = clients[timeoutClientId];
-                    SendPlayerJoined(timeoutClientData, connectedPlayerId, clientData.Controller.transform);
+                    SendPlayerJoined(timeoutClientData, connectedPlayerId, clientData.PlayerName, clientData.Controller.transform);
                     clientData.PlayerJoinedTimeouts[timeoutClientId] = PlayerJoinedTimeout;
                 }
             }
@@ -184,28 +183,29 @@ public class ServerEntity : MonoBehaviour
         var playerConnectionPacket = connectionChannel.GetPacket();
         
         if (playerConnectionPacket == null) return;
-        Debug.Log("PLAYER CONNECTION");
+        
         var buffer = playerConnectionPacket.buffer;
 
-        var newClientId = DeserializeJoin(buffer);
-
-        clients.Add(newClientId, new ClientData()); // Add new client data to dictionary
-        var clientData = clients[newClientId];
+        var newClientData = DeserializeJoin(buffer);
+        var newClientId = newClientData.PlayerId;
+        Debug.Log($"PLAYER '{newClientData.PlayerName}' CONNECTED");
+        
+        clients.Add(newClientId, newClientData); // Add new client data to dictionary
         
         // Instantiate client character controller
         CharacterController controller = Instantiate(cubePrefab, transform).GetComponent<CharacterController>();
-        clientData.Controller = controller;
+        newClientData.Controller = controller;
         //controller.GetComponent<Renderer>().material.color = serverCubesColor;
         //controller.GetComponent<Renderer>().enabled = true;
-        clientData.PlayerCopyManager = controller.GetComponent<PlayerCopyManager>();
+        newClientData.PlayerCopyManager = controller.GetComponent<PlayerCopyManager>();
 
         // Setup client ports & channels
         var serverPort = ClientBasePort + clientCount * PortsPerClient;
         var clientPort = ClientBasePort + clientCount * PortsPerClient + 1;
-        clientData.ServerPort = serverPort;
-        clientData.ClientPort = clientPort;
-        clientData.Channel = new Channel(serverPort);
-        clientData.ClientIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), clientPort);
+        newClientData.ServerPort = serverPort;
+        newClientData.ClientPort = clientPort;
+        newClientData.Channel = new Channel(serverPort);
+        newClientData.ClientIpEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), clientPort);
         
         // Setup client transform data
         var clientTransform = controller.transform;
@@ -214,7 +214,7 @@ public class ServerEntity : MonoBehaviour
         
         controller.name = $"ServerInstance-{newClientId}";
         controller.gameObject.layer = LayerMask.NameToLayer("Server");
-        clientData.Health = FullPlayerHealth;
+        newClientData.Health = FullPlayerHealth;
         clientCount++;
 
         SendPlayerJoinedResponse(newClientId, clientTransform); // Send response to client manager
@@ -225,21 +225,25 @@ public class ServerEntity : MonoBehaviour
             var data = client.Value;
             if (clientId != newClientId)
             {
-                SendPlayerJoined(data, newClientId, clientTransform);
-                clientData.PlayerJoinedTimeouts.Add(clientId, PlayerJoinedTimeout);
+                SendPlayerJoined(data, newClientId, newClientData.PlayerName, clientTransform);
+                newClientData.PlayerJoinedTimeouts.Add(clientId, PlayerJoinedTimeout);
             }
         }
     }
     
-    private int DeserializeJoin(BitBuffer buffer)
+    private ClientData DeserializeJoin(BitBuffer buffer)
     {
         PacketType messageType = (PacketType) buffer.GetByte();
 
         if (messageType != PacketType.Join)
             throw new ArgumentException("Unknown message type received from client manager.");
+
+        var newClientData = new ClientData();
         
-        var userId = buffer.GetInt();
-        return userId;
+        newClientData.PlayerId = buffer.GetInt();
+        newClientData.PlayerName = buffer.GetString();
+
+        return newClientData;
     }
 
     private void SendPlayerJoinedResponse(int newUserId, Transform newClientTransform)
@@ -247,7 +251,7 @@ public class ServerEntity : MonoBehaviour
         var packet = Packet.Obtain();
         ServerSerializationManager.SerializePlayerJoinedResponse(packet.buffer, newUserId, clients, serverTime,
             nextSnapshotSeq, minInterpolationBufferElems, newClientTransform.position, newClientTransform.rotation,
-            FullPlayerHealth, clientCount);
+            FullPlayerHealth, PlayerSpeed, GravityValue, clientCount);
         packet.buffer.Flush();
 
         connectionChannel.Send(packet, connectionIpEndPoint);
@@ -255,10 +259,10 @@ public class ServerEntity : MonoBehaviour
         packet.Free();
     }
 
-    private static void SendPlayerJoined(ClientData clientData, int newUserId, Transform newClientTransform)
+    private static void SendPlayerJoined(ClientData clientData, int newUserId, string newClientName, Transform newClientTransform)
     {
         var packet = Packet.Obtain();
-        ServerSerializationManager.SerializePlayerJoined(packet.buffer, newUserId, newClientTransform.position, 
+        ServerSerializationManager.SerializePlayerJoined(packet.buffer, newUserId, newClientName, newClientTransform.position, 
             newClientTransform.rotation);
         packet.buffer.Flush();
         

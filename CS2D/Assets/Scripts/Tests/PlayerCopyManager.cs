@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class PlayerCopyManager : MonoBehaviour
 {
+    private string playerName;
+    
     private CharacterController characterController;
 
     private bool isDead;
@@ -65,6 +67,12 @@ public class PlayerCopyManager : MonoBehaviour
     public void MovePlayerCopyDirect(Vector3 newPosition)
     {
         characterController.Move(newPosition - transform.position);
+    }
+
+    public string PlayerName
+    {
+        get => playerName;
+        set => playerName = value;
     }
 
     public bool IsDead

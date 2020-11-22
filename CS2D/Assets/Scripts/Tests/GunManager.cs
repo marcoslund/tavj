@@ -183,10 +183,6 @@ public class GunManager : MonoBehaviour
 					{
 						clientEntity.SendPlayerShotMessage(shotPlayerId);
 					}
-					else
-					{
-						Debug.Log("PLAYER ALREADY DEAD");
-					}
 				}
 			}
 			

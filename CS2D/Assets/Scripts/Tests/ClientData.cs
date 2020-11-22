@@ -12,6 +12,9 @@ public class ClientData
     private IPEndPoint clientIpEndPoint;
 
     private Dictionary<int, float> playerJoinedTimeouts = new Dictionary<int, float>();
+
+    private int playerId;
+    private string playerName;
     
     private List<Commands> recvCommands = new List<Commands>();
     private int recvCommandSeq;
@@ -52,6 +55,18 @@ public class ClientData
     {
         get => playerJoinedTimeouts;
         set => playerJoinedTimeouts = value;
+    }
+
+    public int PlayerId
+    {
+        get => playerId;
+        set => playerId = value;
+    }
+
+    public string PlayerName
+    {
+        get => playerName;
+        set => playerName = value;
     }
 
     public List<Commands> RecvCommands

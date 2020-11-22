@@ -8,37 +8,35 @@ using UnityEngine;
 
 public class ClientEntity : MonoBehaviour
 {
-    public int clientPort;
-    public int serverPort;
+    private int clientPort;
+    private int serverPort;
     private Channel channel;
     private IPEndPoint serverIpEndPoint;
 
-    public int clientId;
-    public int displaySeq = 0; // Current min frame being used for interpolation
-    public float clientTime = 0;
-    public bool isPlaying;
+    private int clientId;
+    private string clientName;
+    
+    private int displaySeq = 0; // Current min frame being used for interpolation
+    private float clientTime = 0;
+    private bool isPlaying;
 
-    public List<Snapshot> interpolationBuffer = new List<Snapshot>();
-    public int minInterpolationBufferElems;
+    private List<Snapshot> interpolationBuffer = new List<Snapshot>();
+    private int minInterpolationBufferElems;
 
     private readonly Commands commandsToSend = new Commands();
-    public List<Commands> unAckedCommands = new List<Commands>();
+    private List<Commands> unAckedCommands = new List<Commands>();
     private readonly List<Commands> predictionCommands = new List<Commands>();
 
     private readonly Dictionary<int, PlayerCopyManager> otherPlayers = new Dictionary<int, PlayerCopyManager>();
-    //private Color clientColor;
 
     private CharacterController characterController;
-    //private int clientLayer;
-    [HideInInspector] public float currentSpeed;
-    
-    public float walkingSpeed = 5.0f; // TODO HARDCODED, RECV FROM SERVER
-    public float gravityValue = -9.81f;
+    [HideInInspector] public float speed;
+    private float gravity;
     private float velocityY;
 
     private int shotSeq = 1;
-    public List<Shot> unAckedShots = new List<Shot>();
-    public int health;
+    private List<Shot> unAckedShots = new List<Shot>();
+    private int health;
     private int startingHealth;
     private PlayerHealth playerHealthManager;
     [HideInInspector] public bool playerDead;
@@ -60,10 +58,13 @@ public class ClientEntity : MonoBehaviour
     private float deathCameraRotationX = 35f;
     private FirstPersonView firstPersonView;
 
+    public UIEventManager uiEventManagerventManager;
+
     private void Awake()
     {
         clientId = PlayerPrefs.GetInt("ClientId");
         transform.name = $"Client-{clientId}";
+        clientName = PlayerPrefs.GetString("PlayerName");
         
         /* Networking variables */
         clientPort = PlayerPrefs.GetInt("ClientPort");
@@ -93,9 +94,10 @@ public class ClientEntity : MonoBehaviour
         startingHealth = health;
         playerHealthManager = GetComponent<PlayerHealth>();
 
+        speed = PlayerPrefs.GetFloat("PlayerSpeed");
+        gravity = PlayerPrefs.GetFloat("Gravity");
+
         characterController = GetComponent<CharacterController>();
-        //this.clientLayer = clientLayer;
-        currentSpeed = walkingSpeed;
         
         InitializeConnectedPlayers();
         
@@ -116,6 +118,7 @@ public class ClientEntity : MonoBehaviour
         for (var i = 1; i <= connectedPlayerCount; i++)
         {
             var connectedPlayerId = PlayerPrefs.GetInt($"ConnectedPlayer{i}Id");
+            var connectedPlayerName = PlayerPrefs.GetString($"ConnectedPlayer{i}Name");
             var position = new Vector3();
             var rotation = new Quaternion();
 
@@ -127,7 +130,7 @@ public class ClientEntity : MonoBehaviour
             rotation.y = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotY");
             rotation.z = PlayerPrefs.GetFloat($"ConnectedPlayer{i}RotZ");
             
-            InitializeConnectedPlayer(connectedPlayerId, position, rotation);
+            InitializeConnectedPlayer(connectedPlayerId, connectedPlayerName, position, rotation);
         }
     }
 
@@ -356,14 +359,14 @@ public class ClientEntity : MonoBehaviour
         foreach (var commands in predictionCommands)
         {
             Vector3 move = Vector3.zero;
-            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
-            move.z += commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+            move.x += commands.GetHorizontal() * Time.fixedDeltaTime * speed;
+            move.z += commands.GetVertical() * Time.fixedDeltaTime * speed;
             transform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
             move = transform.TransformDirection(move);
             
             if (!characterController.isGrounded)
             {
-                recvVelY += gravityValue * Time.fixedDeltaTime;
+                recvVelY += gravity * Time.fixedDeltaTime;
                 move.y = velocityY * Time.fixedDeltaTime;
             }
             
@@ -378,25 +381,25 @@ public class ClientEntity : MonoBehaviour
         Vector3 move = Vector3.zero;
         /*bool canJump = false;*/
         
-        move.x = commands.GetHorizontal() * Time.fixedDeltaTime * walkingSpeed;
-        move.z = commands.GetVertical() * Time.fixedDeltaTime * walkingSpeed;
+        move.x = commands.GetHorizontal() * Time.fixedDeltaTime * speed;
+        move.z = commands.GetVertical() * Time.fixedDeltaTime * speed;
         move = transform.TransformDirection(move);
         
         if (!characterController.isGrounded)
         {
-            velocityY += gravityValue * Time.fixedDeltaTime;
+            velocityY += gravity * Time.fixedDeltaTime;
             move.y = velocityY * Time.fixedDeltaTime;
         }
         else
         {
-            velocityY = gravityValue * Time.fixedDeltaTime;
-            move.y = gravityValue * Time.fixedDeltaTime;
+            velocityY = gravity * Time.fixedDeltaTime;
+            move.y = gravity * Time.fixedDeltaTime;
             //canJump = true;
         }
         
         /*if (commands.Space && _characterController.isGrounded && canJump)
         {
-            velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue); TOO SMALL
+            velocity += jumpSpeed;//Mathf.Sqrt(jumpHeight * -3.0f * gravityValue);
             move.y += velocity * Time.fixedDeltaTime;
             canJump = false;
         }*/
@@ -440,7 +443,7 @@ public class ClientEntity : MonoBehaviour
     private void DeserializePlayerJoined(BitBuffer buffer)
     {
         var newPlayerId = buffer.GetInt();
-            
+        var newPlayerName = buffer.GetString();
         var position = new Vector3();
         var rotation = new Quaternion();
             
@@ -452,21 +455,22 @@ public class ClientEntity : MonoBehaviour
         rotation.y = buffer.GetFloat();
         rotation.z = buffer.GetFloat();
         
-        InitializeConnectedPlayer(newPlayerId, position, rotation);
+        InitializeConnectedPlayer(newPlayerId, newPlayerName, position, rotation);
         
         SendPlayerJoinedAck(newPlayerId);
     }
 
-    public void InitializeConnectedPlayer(int connectedPlayerId, Vector3 position, Quaternion rotation)
+    public void InitializeConnectedPlayer(int connectedPlayerId, string connectedPlayerName, Vector3 position, Quaternion rotation)
     {
         var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation);
         newClient.name = $"{connectedPlayerId}";
-        //newClient.layer = LayerMask.NameToLayer($"Client {clientLayer}");  // TODO CHANGE LAYER
         newClient.transform.position = position;
         newClient.transform.rotation = rotation;
-        //newClient.GetComponent<Renderer>().material.color = clientColor;
+
+        var connectedPlayerManager = newClient.GetComponent<PlayerCopyManager>();
+        connectedPlayerManager.PlayerName = connectedPlayerName;
         
-        otherPlayers.Add(connectedPlayerId, newClient.GetComponent<PlayerCopyManager>());
+        otherPlayers.Add(connectedPlayerId, connectedPlayerManager);
     }
     
     private void SendPlayerJoinedAck(int newPlayerId)
@@ -525,19 +529,20 @@ public class ClientEntity : MonoBehaviour
         var shooterId = buffer.GetInt();
         var shotPlayerId = buffer.GetInt();
         var shotPlayerHealth = buffer.GetInt();
-
         if (shotPlayerId == clientId)
         {
             health = shotPlayerHealth;
             playerHealthManager.SetPlayerHealth(health);
             if (health <= 0)
             {
+                uiEventManagerventManager.ShowKillEvent(otherPlayers[shooterId].PlayerName, clientName);
                 ShowOwnDeathAnimation();
             }
         } else if (shotPlayerHealth <= 0)
         {
             var shotPlayer = otherPlayers[shotPlayerId];
             shotPlayer.IsDead = true;
+            uiEventManagerventManager.ShowKillEvent(shooterId == clientId? clientName : otherPlayers[shooterId].PlayerName, shotPlayer.PlayerName);
             shotPlayer.TriggerDeathAnimation();
         }
         // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
@@ -623,4 +628,6 @@ public class ClientEntity : MonoBehaviour
             }
         }
     }
+
+    public string ClientName => clientName;
 }
