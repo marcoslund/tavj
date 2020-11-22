@@ -17,6 +17,7 @@ public class ClientData
     private int recvCommandSeq;
     private int recvShotSeq;
     private int health;
+    private bool isDead;
     
     private CharacterController controller;
     private float yVelocity;
@@ -93,5 +94,11 @@ public class ClientData
     {
         get => playerCopyManager;
         set => playerCopyManager = value;
+    }
+
+    public bool IsDead
+    {
+        get => isDead;
+        set => isDead = value;
     }
 }

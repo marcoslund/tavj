@@ -92,6 +92,7 @@ public class ClientEntity : MonoBehaviour
         health = PlayerPrefs.GetInt("ClientHealth");;
         startingHealth = health;
         playerHealthManager = GetComponent<PlayerHealth>();
+
         characterController = GetComponent<CharacterController>();
         //this.clientLayer = clientLayer;
         currentSpeed = walkingSpeed;
@@ -128,6 +129,11 @@ public class ClientEntity : MonoBehaviour
             
             InitializeConnectedPlayer(connectedPlayerId, position, rotation);
         }
+    }
+
+    private void Start()
+    {
+        playerHealthManager.InitializePlayerHealth(health);
     }
 
     private void FixedUpdate()
@@ -519,7 +525,7 @@ public class ClientEntity : MonoBehaviour
         if (shotPlayerId == clientId)
         {
             health = shotPlayerHealth;
-            playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
+            playerHealthManager.SetPlayerHealth(health);
             if (health <= 0)
             {
                 ShowOwnDeathAnimation();

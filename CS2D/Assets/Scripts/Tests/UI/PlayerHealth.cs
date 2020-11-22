@@ -5,15 +5,21 @@ using UnityEngine.UI;
 
 public class PlayerHealth : MonoBehaviour
 {
-    public Slider healthSlider;
+    public Healthbar healthbar;
 
-    public void SetPlayerHealth(float value)
+    public void SetPlayerHealth(int value)
     {
-        healthSlider.value = value;
+        healthbar.SetHealth(value);
     }
 
     public void TogglePlayerHealth()
     {
-        healthSlider.gameObject.SetActive(!healthSlider.gameObject.activeSelf);
+        healthbar.gameObject.SetActive(!healthbar.gameObject.activeSelf);
+    }
+
+    public void InitializePlayerHealth(int health)
+    {
+        healthbar.maximumHealth = health;
+        SetPlayerHealth(health);
     }
 }
