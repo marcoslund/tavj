@@ -2335,7 +2335,7 @@ MonoBehaviour:
   gunPrecision: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 1
+    m_Bits: 513
   shotMaxDistance: 1000000
   aimingAnimationName: Player_AImpose
   shootSoundSource: {fileID: 0}

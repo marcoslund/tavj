@@ -102,6 +102,7 @@ public class GunManager : MonoBehaviour
 	public LayerMask layerMask;
 	public float shotMaxDistance = 1000000;
 	RaycastHit shotRaycastHit;
+	private int playerLayer;
 	
 	[Header("Animation names")]
 	public string aimingAnimationName = "Player_AImpose";
@@ -129,11 +130,13 @@ public class GunManager : MonoBehaviour
 
 		rotationLastY = firstPersonView.currentYRotation;
 		rotationLastX= firstPersonView.currentCameraXRotation;
+		
+		playerLayer = LayerMask.NameToLayer("Client 1");
 	}
 
 	private void Start()
 	{
-		layerMask = LayerMask.GetMask(LayerMask.LayerToName(transform.gameObject.layer));
+		//layerMask = LayerMask.GetMask(LayerMask.LayerToName(transform.gameObject.layer));
 	}
 
 	private void Update()
@@ -167,7 +170,7 @@ public class GunManager : MonoBehaviour
 		currentRecoilXPos = Mathf.SmoothDamp(currentRecoilXPos, 0, ref velocity_x_recoil, recoilOverTime_x);
 		currentRecoilYPos = Mathf.SmoothDamp(currentRecoilYPos, 0, ref velocity_y_recoil, recoilOverTime_y);
 	}
-	
+
 	private void Shoot() {
 		if (Input.GetButton ("Fire1") && waitTillNextFire <= 0) {
 			int randomNumberForMuzzelFlash = Random.Range(0,5);
@@ -175,9 +178,11 @@ public class GunManager : MonoBehaviour
 			if (Physics.Raycast(transform.position, transform.forward, out shotRaycastHit, shotMaxDistance,
 				layerMask))
 			{
-				Debug.DrawLine(transform.position, shotRaycastHit.point);
-				clientEntity.SendPlayerShotMessage(shotRaycastHit.transform.name);
-				// TODO Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
+				//Debug.DrawLine(transform.position, shotRaycastHit.point);
+				if (shotRaycastHit.transform.gameObject.layer == playerLayer)
+				{
+					clientEntity.SendPlayerShotMessage(shotRaycastHit.transform.name);
+				}
 			}
 			
 			holdFlash = Instantiate(muzzelFlash[randomNumberForMuzzelFlash], muzzelSpawn.transform.position, 
