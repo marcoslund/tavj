@@ -6,7 +6,7 @@ public class LogConsole : MonoBehaviour
 {
     string myLog = "*begin log";
     string filename = "";
-    bool doShow = true;
+    bool doShow = false;
     int kChars = 700;
     void OnEnable() { Application.logMessageReceived += Log; }
     void OnDisable() { Application.logMessageReceived -= Log; }

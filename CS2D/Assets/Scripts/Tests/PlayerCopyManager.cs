@@ -5,7 +5,8 @@ using UnityEngine;
 public class PlayerCopyManager : MonoBehaviour
 {
     private CharacterController characterController;
-    
+
+    private bool isDead;
     private int? respawnSnapshotSeq;
     private Vector3? respawnPosition;
     
@@ -64,6 +65,12 @@ public class PlayerCopyManager : MonoBehaviour
     public void MovePlayerCopyDirect(Vector3 newPosition)
     {
         characterController.Move(newPosition - transform.position);
+    }
+
+    public bool IsDead
+    {
+        get => isDead;
+        set => isDead = value;
     }
 
     public int? RespawnSnapshotSeq

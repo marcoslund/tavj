@@ -484,9 +484,13 @@ public class ClientEntity : MonoBehaviour
         channel.Disconnect();
     }
 
-    public void SendPlayerShotMessage(string shotPlayerIdStr)
+    public bool OtherPlayerIsDead(int playerId)
     {
-        var shotPlayerId = Int32.Parse(shotPlayerIdStr);
+        return otherPlayers[playerId].IsDead;
+    }
+
+    public void SendPlayerShotMessage(int shotPlayerId)
+    {
         unAckedShots.Add(new Shot(shotSeq, shotPlayerId));
         shotSeq++;
         
@@ -532,7 +536,9 @@ public class ClientEntity : MonoBehaviour
             }
         } else if (shotPlayerHealth <= 0)
         {
-            otherPlayers[shotPlayerId].TriggerDeathAnimation();
+            var shotPlayer = otherPlayers[shotPlayerId];
+            shotPlayer.IsDead = true;
+            shotPlayer.TriggerDeathAnimation();
         }
         // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
     }
@@ -596,6 +602,7 @@ public class ClientEntity : MonoBehaviour
 
     private void RespawnOther(PlayerCopyManager otherPlayer, Vector3 newPosition)
     {
+        otherPlayer.IsDead = false;
         otherPlayer.TriggerRespawnAnimation();
         otherPlayer.MovePlayerCopyDirect(newPosition);
     }

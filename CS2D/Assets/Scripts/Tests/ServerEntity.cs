@@ -376,6 +376,9 @@ public class ServerEntity : MonoBehaviour
         {
             recvShotSequence = shot.Seq;
             var shotPlayerData = clients[shot.ShotPlayerId];
+            
+            if(shotPlayerData.IsDead) continue;
+            
             shotPlayerData.Health -= ShotDamage;
             
             if (shotPlayerData.Health <= 0)

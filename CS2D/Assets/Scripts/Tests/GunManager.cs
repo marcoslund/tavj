@@ -178,7 +178,15 @@ public class GunManager : MonoBehaviour
 				//Debug.DrawLine(transform.position, shotRaycastHit.point);
 				if (shotRaycastHit.transform.gameObject.layer == playerLayer)
 				{
-					clientEntity.SendPlayerShotMessage(shotRaycastHit.transform.name);
+					var shotPlayerId = Int32.Parse(shotRaycastHit.transform.name);
+					if (!clientEntity.OtherPlayerIsDead(shotPlayerId))
+					{
+						clientEntity.SendPlayerShotMessage(shotPlayerId);
+					}
+					else
+					{
+						Debug.Log("PLAYER ALREADY DEAD");
+					}
 				}
 			}
 			
