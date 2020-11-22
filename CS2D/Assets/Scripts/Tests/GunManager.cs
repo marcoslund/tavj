@@ -19,8 +19,6 @@ public class GunManager : MonoBehaviour
 	private ClientEntity clientEntity;
 	
 	[Header("Shooting Setup")]
-	[HideInInspector] public GameObject bulletSpawn;
-	public GameObject bullet;
 	public float roundsPerSecond;
 	private float waitTillNextFire;
 	
@@ -122,7 +120,6 @@ public class GunManager : MonoBehaviour
 		
 		clientEntity = player.GetComponent<ClientEntity>();
 
-		bulletSpawn = GameObject.FindGameObjectWithTag("RaySpawn");
 		hitMarker = transform.Find ("hitMarkerSound").GetComponent<AudioSource> (); //TODO CHANGE
 		
 		firstPersonView.mouseSensitivity_notAiming = mouseSensitivity_notAiming;

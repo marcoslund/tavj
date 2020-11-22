@@ -586,6 +586,7 @@ public class ClientEntity : MonoBehaviour
         gun.SetActive(true);
         firstPersonView.enabled = true;
         playerHealthManager.TogglePlayerHealth();
+        playerHealthManager.SetPlayerHealth(startingHealth);
         transform.position = newPosition;
 
         cameraMain.position = transform.TransformPoint(new Vector3(0,1,0));

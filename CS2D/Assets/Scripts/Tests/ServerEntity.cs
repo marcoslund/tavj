@@ -381,7 +381,6 @@ public class ServerEntity : MonoBehaviour
             if (shotPlayerData.Health <= 0)
             {
                 shotPlayerData.IsDead = true;
-                //shotPlayerData.Health = FullPlayerHealth;
                 StartCoroutine(ShowDeathAnimation(shotPlayerData, shot.ShotPlayerId));
             }
             
@@ -419,6 +418,7 @@ public class ServerEntity : MonoBehaviour
         yield return new WaitForSeconds(RespawnTime);
 
         shotPlayerData.IsDead = false;
+        shotPlayerData.Health = FullPlayerHealth;
         shotPlayerData.PlayerCopyManager.TriggerRespawnAnimation();
         
         var newPosition = spawnPoints[Random.Range(0, spawnPoints.Count)].position;

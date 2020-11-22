@@ -135,6 +135,7 @@ public class Healthbar : MonoBehaviour {
     public void SetHealth(float value)
     {
         health = value;
+        healthPercentage = int.Parse((Mathf.Round(maximumHealth * (health / 100f))).ToString());
         UpdateHealth();
     }
 }
