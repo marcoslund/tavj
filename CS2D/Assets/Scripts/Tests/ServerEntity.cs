@@ -25,7 +25,6 @@ public class ServerEntity : MonoBehaviour
     
     private const int PortsPerClient = 2;
     private const int ClientBasePort = 9010;
-    public const int MaxClientCount = 10; // TODO IMPLEMENT LIMIT FAILURE
     public int clientCount = 0;
     private const float PlayerJoinedTimeout = 1f;
     public int minInterpolationBufferElems = 2;

@@ -49,7 +49,7 @@ public class PlayMenu : MonoBehaviour
     {
         var playerName = playerNameInput.text;
         var ip = gameIpInput.text;
-        PlayerPrefs.SetString("PlayerName", string.IsNullOrWhiteSpace(playerName)? "Player" : playerName);
+        PlayerPrefs.SetString("PlayerName", string.IsNullOrWhiteSpace(playerName)? "PLAYER" : playerName);
         PlayerPrefs.SetString("ServerIp", string.IsNullOrWhiteSpace(ip)? "127.0.0.1" : ip);
         PlayerPrefs.Save();
     }
