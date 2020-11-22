@@ -109,4 +109,15 @@ public static class ServerSerializationManager
         buffer.PutInt(shotPlayerId);
         buffer.PutInt(health);
     }
+
+    public static void SerializePlayerRespawnBroadcast(BitBuffer buffer, int shotPlayerId, Vector3 newPosition,
+        int nextSnapshotSeq)
+    {
+        buffer.PutByte((int) PacketType.PlayerRespawn);
+        buffer.PutInt(shotPlayerId);
+        buffer.PutInt(nextSnapshotSeq);
+        buffer.PutFloat(newPosition.x);
+        buffer.PutFloat(newPosition.y);
+        buffer.PutFloat(newPosition.z);
+    }
 }

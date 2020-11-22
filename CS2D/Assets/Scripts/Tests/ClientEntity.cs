@@ -42,6 +42,7 @@ public class ClientEntity : MonoBehaviour
     private int startingHealth;
     private PlayerHealth playerHealthManager;
     [HideInInspector] public bool playerDead;
+    private List<int> playersToRespawn = new List<int>();
 
     [HideInInspector] public Transform cameraMain;
     [HideInInspector] public Vector3 cameraPosition;
@@ -176,9 +177,11 @@ public class ClientEntity : MonoBehaviour
             displaySeq++;
             if (interpolationBuffer.Count < 2)
                 isPlaying = false;
+
+            CheckPlayersRespawn();
         }
     }
-    
+
     private IEnumerator SpawnWeaponUponStart() {
         yield return new WaitForSeconds (0.5f);
         if (weaponChanging)
@@ -237,7 +240,7 @@ public class ClientEntity : MonoBehaviour
             rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
-
+            
             playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }
     }
@@ -271,6 +274,9 @@ public class ClientEntity : MonoBehaviour
                 break;
             case PacketType.PlayerShotBroadcast:
                 DeserializeShotBroadcast(buffer);
+                break;
+            case PacketType.PlayerRespawn:
+                DeserializePlayerRespawn(buffer);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -516,7 +522,7 @@ public class ClientEntity : MonoBehaviour
             playerHealthManager.SetPlayerHealth(health / (float) startingHealth);
             if (health <= 0)
             {
-                StartCoroutine(ShowDeathAnimation());
+                ShowOwnDeathAnimation();
             }
         } else if (shotPlayerHealth <= 0)
         {
@@ -525,7 +531,7 @@ public class ClientEntity : MonoBehaviour
         // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
     }
 
-    private IEnumerator ShowDeathAnimation()
+    private void ShowOwnDeathAnimation()
     {
         playerDead = true;
         gun.SetActive(false);
@@ -533,22 +539,74 @@ public class ClientEntity : MonoBehaviour
         playerHealthManager.TogglePlayerHealth();
         thirdPersonModel.SetActive(true);
         
-        var originalCameraPos = cameraMain.position;
         var originalCameraRot = cameraMain.rotation.eulerAngles;
         cameraMain.position = transform.TransformPoint(deathCameraPosition);
         cameraMain.rotation = Quaternion.Euler(new Vector3(deathCameraRotationX, originalCameraRot.y, originalCameraRot.z));
         
         thirdPersonAnimator.SetTrigger("Dying");
+    }
+
+    private void DeserializePlayerRespawn(BitBuffer buffer)
+    {
+        var playerId = buffer.GetInt();
+        var respawnSnapshotSeq = buffer.GetInt();
+        var respawnPosition = new Vector3(buffer.GetFloat(), buffer.GetFloat(), buffer.GetFloat());
         
-        yield return new WaitForSeconds(6f);
-        
-        /*thirdPersonModel.SetActive(false);
+        if (playerId == clientId)
+        {
+            RespawnSelf(respawnPosition);
+        }
+        else
+        {
+            var respawnPlayer = otherPlayers[playerId];
+            if (displaySeq >= respawnSnapshotSeq)
+            {
+                RespawnOther(respawnPlayer, respawnPosition);
+            }
+            else
+            {
+                // To avoid wrong interpolation, save data until correct snapshot is being used
+                respawnPlayer.RespawnSnapshotSeq = respawnSnapshotSeq;
+                respawnPlayer.RespawnPosition = respawnPosition;
+                playersToRespawn.Add(playerId);
+            }
+        }
+    }
+
+    private void RespawnSelf(Vector3 newPosition)
+    {
+        thirdPersonAnimator.SetTrigger("Respawn");
+        thirdPersonModel.SetActive(false);
         gun.SetActive(true);
         firstPersonView.enabled = true;
         playerHealthManager.TogglePlayerHealth();
+        transform.position = newPosition;
 
-        cameraMain.position = originalCameraPos;
-        //cameraMain.rotation = originalCameraRot;
-        playerDead = false;*/
+        cameraMain.position = transform.TransformPoint(new Vector3(0,1,0));
+        cameraMain.rotation = Quaternion.Euler(Vector3.zero);
+        playerDead = false;
+    }
+
+    private void RespawnOther(PlayerCopyManager otherPlayer, Vector3 newPosition)
+    {
+        otherPlayer.TriggerRespawnAnimation();
+        otherPlayer.MovePlayerCopyDirect(newPosition);
+    }
+    
+    // Called when new snapshot is switched for interpolation, for awaiting respawns
+    private void CheckPlayersRespawn()
+    {
+        var temp = new List<int>(playersToRespawn);
+        foreach (var playerId in temp)
+        {
+            var otherPlayer = otherPlayers[playerId];
+            if (otherPlayer.RespawnSnapshotSeq.GetValueOrDefault() <= displaySeq)
+            {
+                RespawnOther(otherPlayer, otherPlayer.RespawnPosition.GetValueOrDefault());
+                otherPlayer.RespawnSnapshotSeq = null;
+                otherPlayer.RespawnPosition = null;
+                playersToRespawn.Remove(playerId);
+            }
+        }
     }
 }

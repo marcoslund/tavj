@@ -44,6 +44,7 @@ public class ServerEntity : MonoBehaviour
 
     private const int FullPlayerHealth = 100;
     private const int ShotDamage = 10;
+    private const float RespawnTime = 6f;
 
     // Start is called before the first frame update
     private void Awake() {
@@ -376,7 +377,11 @@ public class ServerEntity : MonoBehaviour
             recvShotSequence = shot.Seq;
             var shotPlayerData = clients[shot.ShotPlayerId];
             shotPlayerData.Health -= ShotDamage;
-            // CHECK IF DEAD...
+            
+            if (shotPlayerData.Health <= 0)
+            {
+                StartCoroutine(ShowDeathAnimation(shotPlayerData, shot.ShotPlayerId));
+            }
             
             foreach (var clientPair in clients)
             {
@@ -398,6 +403,35 @@ public class ServerEntity : MonoBehaviour
     {
         var packet = Packet.Obtain();
         ServerSerializationManager.SerializePlayerShotBroadcast(packet.buffer, shooterId, shotPlayerId, health);
+        packet.buffer.Flush();
+
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
+
+        packet.Free();
+    }
+    
+    private IEnumerator ShowDeathAnimation(ClientData shotPlayerData, int shotPlayerId)
+    {
+        shotPlayerData.PlayerCopyManager.TriggerDeathAnimation();
+        
+        yield return new WaitForSeconds(RespawnTime);
+        
+        shotPlayerData.PlayerCopyManager.TriggerRespawnAnimation();
+        
+        var newPosition = spawnPoints[Random.Range(0, spawnPoints.Count)].position;
+        shotPlayerData.Controller.transform.position = newPosition;
+        
+        foreach (var clientPair in clients)
+        {
+            var clientData = clientPair.Value;
+            SendPlayerRespawnBroadcast(clientData, shotPlayerId, newPosition);
+        }
+    }
+    
+    private void SendPlayerRespawnBroadcast(ClientData clientData, int shotPlayerId, Vector3 newPosition)
+    {
+        var packet = Packet.Obtain();
+        ServerSerializationManager.SerializePlayerRespawnBroadcast(packet.buffer, shotPlayerId, newPosition, nextSnapshotSeq);
         packet.buffer.Flush();
 
         clientData.Channel.Send(packet, clientData.ClientIpEndPoint);

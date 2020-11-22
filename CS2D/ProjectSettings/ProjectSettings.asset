@@ -715,10 +715,10 @@ PlayerSettings:
     m_VersionCode: 1
     m_VersionName: 
   apiCompatibilityLevel: 6
-  cloudProjectId: ed11a104-5d97-4508-ac94-87e4d702de7b
+  cloudProjectId:
   framebufferDepthMemorylessMode: 0
-  projectName: 2DOnlineFree
-  organizationId: aleksey-3955878
+  projectName: Warzone
+  organizationId: itba
   cloudEnabled: 0
   enableNativePlatformBackendsForNewInputSystem: 0
   disableOldInputManagerSupport: 0
