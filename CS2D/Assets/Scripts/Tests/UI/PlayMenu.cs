@@ -19,6 +19,8 @@ public class PlayMenu : MonoBehaviour
     
     public void ReturnToMainMenu()
     {
+        connectionManager.StopPlayerConnection();
+        BlockActions(false);
         playMenu.SetActive(false);
         title.SetActive(true);
         mainMenu.SetActive(true);
@@ -33,15 +35,15 @@ public class PlayMenu : MonoBehaviour
     public void JoinGame()
     {
         SavePlayerPrefs();
-        BlockActions();
+        BlockActions(true);
         connectionManager.InitializePlayerConnection();
     }
 
-    private void BlockActions()
+    private void BlockActions(bool value)
     {
         foreach (var btn in actionButtons)
         {
-            btn.interactable = false;
+            btn.interactable = !value;
         }
     }
 

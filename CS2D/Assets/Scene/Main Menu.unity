@@ -3797,7 +3797,6 @@ MonoBehaviour:
   actionButtons:
   - {fileID: 290300662}
   - {fileID: 2032407639}
-  - {fileID: 299536783}
   playerNameInput: {fileID: 887185373}
   gameIpInput: {fileID: 1352349509}
 --- !u!1001 &248421075

@@ -35,7 +35,7 @@ public class ConnectionManager : MonoBehaviour
                 Deserialize(buffer);
             }
 
-            UpdateConnectionTimeouts();
+            UpdateConnectionTimeout();
         }
     }
 
@@ -48,19 +48,19 @@ public class ConnectionManager : MonoBehaviour
         clientId = Random.Range(0, int.MaxValue); // Collisions are unlikely
         clientName = PlayerPrefs.GetString("PlayerName");
         SendClientConnection(clientId, clientName);
-        Debug.Log("SENT CONNECTION REQUEST");
+        Debug.Log("CONNECTION REQUEST SENT");
         
         connectionTimeoutTimer = ClientConnectionTimeout;
     }
 
-    private void UpdateConnectionTimeouts()
+    private void UpdateConnectionTimeout()
     {
         var remainingTime = connectionTimeoutTimer - Time.deltaTime;
         // Check if timeout has been reached
         if (remainingTime <= 0)
         {
             SendClientConnection(clientId, clientName);
-            Debug.Log("SENT CONNECTION REQUEST");
+            Debug.Log("CONNECTION REQUEST SENT");
             connectionTimeoutTimer = ClientConnectionTimeout;
         }
         else
@@ -180,5 +180,11 @@ public class ConnectionManager : MonoBehaviour
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}RotY", rotation.y);
             PlayerPrefs.SetFloat($"ConnectedPlayer{i}RotZ", rotation.z);
         }
+    }
+
+    public void StopPlayerConnection() // Should send disconnect package to server... Intended for indefinite timeouts
+    {
+        channel.Disconnect();
+        channel = null;
     }
 }
