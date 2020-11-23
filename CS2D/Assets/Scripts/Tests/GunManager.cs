@@ -104,10 +104,6 @@ public class GunManager : MonoBehaviour
 	
 	[Header("Animation names")]
 	public string aimingAnimationName = "Player_AImpose";
-	
-	[Header("Audio Sources")]
-	public AudioSource shootSoundSource;
-	public static AudioSource hitMarker;
 
 	private void Awake()
 	{
@@ -119,8 +115,6 @@ public class GunManager : MonoBehaviour
 		secondCameraComponent = GameObject.FindGameObjectWithTag("SecondCamera").GetComponent<Camera>();
 		
 		clientEntity = player.GetComponent<ClientEntity>();
-
-		hitMarker = transform.Find ("hitMarkerSound").GetComponent<AudioSource> (); //TODO CHANGE
 		
 		firstPersonView.mouseSensitivity_notAiming = mouseSensitivity_notAiming;
 		firstPersonView.mouseSensitivity_aiming = mouseSensitivity_aiming;
@@ -129,11 +123,6 @@ public class GunManager : MonoBehaviour
 		rotationLastX= firstPersonView.currentCameraXRotation;
 		
 		playerLayer = LayerMask.NameToLayer("Client 1");
-	}
-
-	private void Start()
-	{
-		//layerMask = LayerMask.GetMask(LayerMask.LayerToName(transform.gameObject.layer));
 	}
 
 	private void Update()
@@ -150,7 +139,6 @@ public class GunManager : MonoBehaviour
 	{
 		if (!handsAnimator) return;
 
-		//handsAnimator.SetFloat("walkSpeed", clientEntity.currentSpeed);
 		handsAnimator.SetBool("Aiming", Input.GetButton("Fire2"));
 	}
 	
@@ -161,7 +149,7 @@ public class GunManager : MonoBehaviour
 			(mainCamera.up * (currentGunPosition.y+ currentRecoilYPos)) + 
 			(mainCamera.forward * (currentGunPosition.z + currentRecoilZPos)),ref velV, 0);
 		
-		clientEntity.cameraPosition = new Vector3(currentRecoilXPos, currentRecoilYPos, 0); // shootManager...
+		clientEntity.cameraPosition = new Vector3(currentRecoilXPos, currentRecoilYPos, 0);
 
 		currentRecoilZPos = Mathf.SmoothDamp(currentRecoilZPos, 0, ref velocity_z_recoil, recoilOverTime_z);
 		currentRecoilXPos = Mathf.SmoothDamp(currentRecoilXPos, 0, ref velocity_x_recoil, recoilOverTime_x);
@@ -171,7 +159,7 @@ public class GunManager : MonoBehaviour
 	private void Shoot() {
 		if (Input.GetButton ("Fire1") && waitTillNextFire <= 0) {
 			int randomNumberForMuzzelFlash = Random.Range(0,5);
-
+			
 			if (Physics.Raycast(transform.position, transform.forward, out shotRaycastHit, shotMaxDistance,
 				layerMask))
 			{
@@ -186,11 +174,12 @@ public class GunManager : MonoBehaviour
 				}
 			}
 			
+			clientEntity.PlayShot();
+
 			holdFlash = Instantiate(muzzelFlash[randomNumberForMuzzelFlash], muzzelSpawn.transform.position, 
 				muzzelSpawn.transform.rotation * Quaternion.Euler(0,0,90) );
 			holdFlash.transform.parent = muzzelSpawn.transform;
 			
-			//shootSoundSource.Play();
 			RecoilMath();
 			waitTillNextFire = 1;
 		}

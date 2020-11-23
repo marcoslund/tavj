@@ -280,52 +280,65 @@ public class ServerEntity : MonoBehaviour
 
     private void DeserializeClientMessage(BitBuffer buffer, int clientId)
     {
-        var messageType = (PacketType) buffer.GetByte();
-        
-        switch (messageType)
+        try
         {
-            case PacketType.Commands:
-                var commandsList = DeserializeCommands(buffer);
-                ProcessReceivedCommands(commandsList, clientId);
-                break;
-            case PacketType.PlayerJoinedAck:
-                DeserializePlayerJoinedAck(buffer);
-                break;
-            case PacketType.PlayerShot:
-                var shotsList = DeserializePlayerShot(buffer);
-                ProcessReceivedShots(shotsList, clientId);
-                break;
-            case PacketType.PlayerDisconnect:
-                ProcessPlayerDisconnect(clientId);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException();
+            var messageType = (PacketType) buffer.GetByte();
+
+            switch (messageType)
+            {
+                case PacketType.Commands:
+                    var commandsList = DeserializeCommands(buffer);
+                    ProcessReceivedCommands(commandsList, clientId);
+                    break;
+                case PacketType.PlayerJoinedAck:
+                    DeserializePlayerJoinedAck(buffer);
+                    break;
+                case PacketType.PlayerShot:
+                    var shotsList = DeserializePlayerShot(buffer);
+                    ProcessReceivedShots(shotsList, clientId);
+                    break;
+                case PacketType.PlayerDisconnect:
+                    ProcessPlayerDisconnect(clientId);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        } catch (Exception ex)
+        {
+            Debug.Log("ERROR " + ex.StackTrace);
         }
     }
 
     private List<Commands> DeserializeCommands(BitBuffer buffer)
     {
         var commandsList = new List<Commands>();
-        var playerId = buffer.GetInt();
-        var storedCommandLists = buffer.GetInt();
-        var clientData = clients[playerId];
-        for(var i = 0; i < storedCommandLists; i++)
+        try
         {
-            var seq = buffer.GetInt();
-            
-            var commands = new Commands(
-                seq,
-                buffer.GetByte() > 0,
-                buffer.GetByte() > 0,
-                buffer.GetByte() > 0,
-                buffer.GetByte() > 0,
-                buffer.GetFloat());
-
-            if (clientData.RecvCommandSeq < seq)
+            var playerId = buffer.GetInt();
+            var storedCommandLists = buffer.GetInt();
+            var clientData = clients[playerId];
+            for (var i = 0; i < storedCommandLists; i++)
             {
-                commandsList.Add(commands);
-                clientData.RecvCommandSeq = seq;
+                var seq = buffer.GetInt();
+
+                var commands = new Commands(
+                    seq,
+                    buffer.GetByte() > 0,
+                    buffer.GetByte() > 0,
+                    buffer.GetByte() > 0,
+                    buffer.GetByte() > 0,
+                    buffer.GetFloat());
+
+                if (clientData.RecvCommandSeq < seq)
+                {
+                    commandsList.Add(commands);
+                    clientData.RecvCommandSeq = seq;
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log("ERROR " + ex.StackTrace);
         }
 
         return commandsList;

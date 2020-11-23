@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using Tests;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class ClientEntity : MonoBehaviour
 {
@@ -61,6 +63,15 @@ public class ClientEntity : MonoBehaviour
     public UIEventManager uiEventManagerventManager;
     private bool disconnectFromPauseMenu;
 
+    private AudioSource audioSource;
+    public AudioClip[] walkingClips;
+    private float walkingClipTimer;
+    private float walkingClipTimerLimit = 0.35f;
+
+    public AudioClip shotClip;
+
+    private int latency;
+
     private void Awake()
     {
         clientId = PlayerPrefs.GetInt("ClientId");
@@ -110,6 +121,8 @@ public class ClientEntity : MonoBehaviour
 
         thirdPersonAnimator = thirdPersonModel.GetComponent<Animator>();
         firstPersonView = GetComponent<FirstPersonView>();
+
+        audioSource = GetComponent<AudioSource>();
     }
 
     private void InitializeConnectedPlayers()
@@ -146,6 +159,11 @@ public class ClientEntity : MonoBehaviour
         var move = MovePlayer(commandsToSend);
         if (handsAnimator)
             handsAnimator.SetBool("Moving", commandsToSend.isMoveCommand());
+        
+        if (commandsToSend.isMoveCommand())
+        {
+            CheckWalkingClipTimer();
+        }
         unAckedCommands.Add(new Commands(commandsToSend));
         predictionCommands.Add(new Commands(commandsToSend));
         SendCommands(unAckedCommands);
@@ -154,6 +172,14 @@ public class ClientEntity : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Alpha1)) // TODO ADD REMAINING LATENCIES, LOWER MAX
+        {
+            latency = 0;
+        } else if (Input.GetKeyDown(KeyCode.Alpha5))
+        {
+            latency = 1000;
+        }
+        
         // Check for incoming packets
         var packet = channel.GetPacket();//recvChannel.GetPacket();
         while (packet != null) {
@@ -250,7 +276,8 @@ public class ClientEntity : MonoBehaviour
             rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
-            
+            Debug.Log($"{prevSnapshot.Positions[playerId].x} {prevSnapshot.Positions[playerId].z} " +
+                      $"{nextSnapshot.Positions[playerId].x} {nextSnapshot.Positions[playerId].z} {t} {position.x} {position.z}");
             playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }
     }
@@ -420,9 +447,15 @@ public class ClientEntity : MonoBehaviour
         ClientSerializationManager.SerializeCommands(packet.buffer, commandsList, clientId);
         packet.buffer.Flush();
 
-        channel.Send(packet, serverIpEndPoint);
-
-        packet.Free();
+        if (latency != 0)
+        {
+            Task.Delay(latency).ContinueWith(t => channel.Send(packet, serverIpEndPoint)).ContinueWith(t => packet.Free());
+        }
+        else
+        {
+            channel.Send(packet, serverIpEndPoint);
+            packet.Free();
+        }
     }
 
     private static int DeserializeCommandAck(BitBuffer buffer)
@@ -464,7 +497,7 @@ public class ClientEntity : MonoBehaviour
         SendPlayerJoinedAck(newPlayerId);
     }
 
-    public void InitializeConnectedPlayer(int connectedPlayerId, string connectedPlayerName, Vector3 position, Quaternion rotation)
+    private void InitializeConnectedPlayer(int connectedPlayerId, string connectedPlayerName, Vector3 position, Quaternion rotation)
     {
         var newClient = (GameObject) Instantiate(Resources.Load("CopyCube"), position, rotation);
         newClient.name = $"{connectedPlayerId}";
@@ -504,9 +537,15 @@ public class ClientEntity : MonoBehaviour
         ClientSerializationManager.SerializePlayerShot(packet.buffer, unAckedShots, clientId);
         packet.buffer.Flush();
 
-        channel.Send(packet, serverIpEndPoint);
-
-        packet.Free();
+        if (latency != 0)
+        {
+            Task.Delay(latency).ContinueWith(t => channel.Send(packet, serverIpEndPoint)).ContinueWith(t => packet.Free());
+        }
+        else
+        {
+            channel.Send(packet, serverIpEndPoint);
+            packet.Free();
+        }
     }
 
     private int DeserializeShotAck(BitBuffer buffer)
@@ -678,6 +717,31 @@ public class ClientEntity : MonoBehaviour
         var disconnectedPlayerId = buffer.GetInt();
         Destroy(otherPlayers[disconnectedPlayerId].gameObject);
         otherPlayers.Remove(disconnectedPlayerId);
+    }
+
+    private void PlayRandomClip(AudioClip[] audioClips)
+    {
+        audioSource.PlayOneShot(audioClips[Random.Range(0, audioClips.Length)]);
+    }
+    
+    private void CheckWalkingClipTimer()
+    {
+        walkingClipTimer += Time.fixedDeltaTime;
+        if (walkingClipTimer > walkingClipTimerLimit)
+        {
+            walkingClipTimer = 0;
+            PlayFootstep();
+        }
+    }
+
+    private void PlayFootstep()
+    {
+        PlayRandomClip(walkingClips);
+    }
+
+    public void PlayShot()
+    {
+        audioSource.PlayOneShot(shotClip);
     }
 
     public int ClientId => clientId;
