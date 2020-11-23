@@ -11,10 +11,10 @@ GameObject:
   - component: {fileID: 471318}
   - component: {fileID: 3347578}
   - component: {fileID: 2362062}
-  - component: {fileID: 10856388}
-  - component: {fileID: 114283024315361750}
+  - component: {fileID: 10879326}
+  - component: {fileID: 114134455802474916}
   m_Layer: 0
-  m_Name: muzzelFlash 02
+  m_Name: muzzelFlashLight3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -49,7 +49,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 199458}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -61,7 +61,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 380a0f7657a8d6043b2d85664cc0fe7b, type: 2}
+  - {fileID: 2100000, guid: f2b70daa9b1a64645abe9061abddbe8f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -83,7 +83,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!108 &10856388
+--- !u!108 &10879326
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -144,7 +144,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0
---- !u!114 &114283024315361750
+--- !u!114 &114134455802474916
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

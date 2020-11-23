@@ -531,6 +531,7 @@ public class ClientEntity : MonoBehaviour
         var shooterId = buffer.GetInt();
         var shotPlayerId = buffer.GetInt();
         var shotPlayerHealth = buffer.GetInt();
+        
         if (shotPlayerId == clientId)
         {
             health = shotPlayerHealth;
@@ -538,7 +539,9 @@ public class ClientEntity : MonoBehaviour
             if (health <= 0)
             {
                 uiEventManagerventManager.ShowKillEvent(
+                    shooterId,
                     otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER", 
+                    shotPlayerId,
                     clientName);
                 ShowOwnDeathAnimation();
             }
@@ -548,11 +551,17 @@ public class ClientEntity : MonoBehaviour
             
             var shotPlayer = otherPlayers[shotPlayerId];
             shotPlayer.IsDead = true;
-            uiEventManagerventManager.ShowKillEvent(shooterId == clientId? clientName : 
-                (otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER"), shotPlayer.PlayerName);
+            uiEventManagerventManager.ShowKillEvent(shooterId, shooterId == clientId? clientName : 
+                (otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER"), shotPlayerId, shotPlayer.PlayerName);
             shotPlayer.TriggerDeathAnimation();
         }
-        // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
+
+        if (shooterId != clientId && otherPlayers.ContainsKey(shooterId))
+        {
+            otherPlayers[shooterId].ShowMuzzelFlash();
+        }
+        
+        // TODO SEND ACK...
     }
 
     private void ShowOwnDeathAnimation()
@@ -670,6 +679,8 @@ public class ClientEntity : MonoBehaviour
         Destroy(otherPlayers[disconnectedPlayerId].gameObject);
         otherPlayers.Remove(disconnectedPlayerId);
     }
+
+    public int ClientId => clientId;
 
     public string ClientName => clientName;
 

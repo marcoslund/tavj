@@ -8,6 +8,9 @@ public class PlayerCopyManager : MonoBehaviour
     
     private CharacterController characterController;
 
+    public GameObject[] muzzelFlash;
+    public Transform muzzelSpawn;
+
     private bool isDead;
     private int? respawnSnapshotSeq;
     private Vector3? respawnPosition;
@@ -67,6 +70,13 @@ public class PlayerCopyManager : MonoBehaviour
     public void MovePlayerCopyDirect(Vector3 newPosition)
     {
         characterController.Move(newPosition - transform.position);
+    }
+
+    public void ShowMuzzelFlash()
+    {
+        var holdFlash = Instantiate(muzzelFlash[Random.Range(0,5)], muzzelSpawn.transform.position, 
+            muzzelSpawn.transform.rotation * Quaternion.Euler(0,0,90) );
+        holdFlash.transform.parent = muzzelSpawn.transform;
     }
 
     public string PlayerName

@@ -11,21 +11,25 @@ public class UIEventManager : MonoBehaviour
     private CanvasGroup canvasGroup;
 
     private const float EventMessageTimeout = 3.5f;
+    private int clientId;
     private string clientName;
     private const float FadeDuration = 0.5f;
 
     private void Start()
     {
         canvasGroup = GetComponent<CanvasGroup>();
-        clientName = GameObject.FindWithTag("ClientEntity").GetComponent<ClientEntity>().ClientName;
+        var clientEntity = GameObject.FindWithTag("ClientEntity").GetComponent<ClientEntity>();
+        clientId = clientEntity.ClientId;
+        clientName = clientEntity.ClientName;
     }
 
-    public void ShowKillEvent(string shooterName, string victimName) // NEW EVENTS STEP OVER CURRENT ONES...
+    public void ShowKillEvent(int shooterId, string shooterName, int victimId, string victimName) // NEW EVENTS STEP OVER CURRENT ONES...
     {
-        if (shooterName == clientName)
+        if (shooterId == clientId)
         {
             textComponent.text = $"YOU KILLED {victimName}";
-        } else if (victimName == clientName)
+        }
+        else if (victimId == clientId)
         {
             textComponent.text = $"YOU WERE KILLED BY {shooterName}";
         }
