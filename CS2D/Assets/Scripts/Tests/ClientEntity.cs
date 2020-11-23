@@ -59,6 +59,7 @@ public class ClientEntity : MonoBehaviour
     private FirstPersonView firstPersonView;
 
     public UIEventManager uiEventManagerventManager;
+    private bool disconnectFromPauseMenu;
 
     private void Awake()
     {
@@ -287,6 +288,9 @@ public class ClientEntity : MonoBehaviour
             case PacketType.PlayerRespawn:
                 DeserializePlayerRespawn(buffer);
                 break;
+            case PacketType.PlayerDisconnectBroadcast:
+                DeserializePlayerDisconnectBroadcast(buffer);
+                break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -484,12 +488,10 @@ public class ClientEntity : MonoBehaviour
         packet.Free();
     }
 
-    private void OnDestroy() {
-        channel.Disconnect();
-    }
-
     public bool OtherPlayerIsDead(int playerId)
     {
+        if (!otherPlayers.ContainsKey(playerId)) return false;
+        
         return otherPlayers[playerId].IsDead;
     }
 
@@ -535,14 +537,19 @@ public class ClientEntity : MonoBehaviour
             playerHealthManager.SetPlayerHealth(health);
             if (health <= 0)
             {
-                uiEventManagerventManager.ShowKillEvent(otherPlayers[shooterId].PlayerName, clientName);
+                uiEventManagerventManager.ShowKillEvent(
+                    otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER", 
+                    clientName);
                 ShowOwnDeathAnimation();
             }
         } else if (shotPlayerHealth <= 0)
         {
+            if (!otherPlayers.ContainsKey(shotPlayerId)) return;
+            
             var shotPlayer = otherPlayers[shotPlayerId];
             shotPlayer.IsDead = true;
-            uiEventManagerventManager.ShowKillEvent(shooterId == clientId? clientName : otherPlayers[shooterId].PlayerName, shotPlayer.PlayerName);
+            uiEventManagerventManager.ShowKillEvent(shooterId == clientId? clientName : 
+                (otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER"), shotPlayer.PlayerName);
             shotPlayer.TriggerDeathAnimation();
         }
         // TODO SHOW SHOOTING ANIMATION & BLOOD, SEND ACK
@@ -575,6 +582,8 @@ public class ClientEntity : MonoBehaviour
         }
         else
         {
+            if(!otherPlayers.ContainsKey(playerId)) return;
+            
             var respawnPlayer = otherPlayers[playerId];
             if (displaySeq >= respawnSnapshotSeq)
             {
@@ -618,16 +627,55 @@ public class ClientEntity : MonoBehaviour
         var temp = new List<int>(playersToRespawn);
         foreach (var playerId in temp)
         {
-            var otherPlayer = otherPlayers[playerId];
-            if (otherPlayer.RespawnSnapshotSeq.GetValueOrDefault() <= displaySeq)
+            if (!otherPlayers.ContainsKey(playerId))
             {
-                RespawnOther(otherPlayer, otherPlayer.RespawnPosition.GetValueOrDefault());
-                otherPlayer.RespawnSnapshotSeq = null;
-                otherPlayer.RespawnPosition = null;
                 playersToRespawn.Remove(playerId);
+            }
+            else
+            {
+                var otherPlayer = otherPlayers[playerId];
+                if (otherPlayer.RespawnSnapshotSeq.GetValueOrDefault() <= displaySeq)
+                {
+                    RespawnOther(otherPlayer, otherPlayer.RespawnPosition.GetValueOrDefault());
+                    otherPlayer.RespawnSnapshotSeq = null;
+                    otherPlayer.RespawnPosition = null;
+                    playersToRespawn.Remove(playerId);
+                }
             }
         }
     }
 
+    public void SendPlayerDisconnect()
+    {
+        var packet = Packet.Obtain();
+        ClientSerializationManager.SerializePlayerDisconnect(packet.buffer);
+        packet.buffer.Flush();
+
+        channel.Send(packet, serverIpEndPoint);
+
+        packet.Free();
+    }
+    
+    private void OnDestroy() {
+        if (!disconnectFromPauseMenu)
+        {
+            SendPlayerDisconnect();
+        }
+        channel.Disconnect();
+    }
+    
+    private void DeserializePlayerDisconnectBroadcast(BitBuffer buffer)
+    {
+        var disconnectedPlayerId = buffer.GetInt();
+        Destroy(otherPlayers[disconnectedPlayerId].gameObject);
+        otherPlayers.Remove(disconnectedPlayerId);
+    }
+
     public string ClientName => clientName;
+
+    public bool DisconnectFromPauseMenu
+    {
+        get => disconnectFromPauseMenu;
+        set => disconnectFromPauseMenu = value;
+    }
 }

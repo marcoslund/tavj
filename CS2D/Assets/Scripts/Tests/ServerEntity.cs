@@ -43,6 +43,8 @@ public class ServerEntity : MonoBehaviour
     private const int FullPlayerHealth = 100;
     private const int ShotDamage = 10;
     private const float RespawnTime = 6f;
+    
+    private List<int> disconnectsToRemove = new List<int>();
 
     // Start is called before the first frame update
     private void Awake() {
@@ -94,6 +96,12 @@ public class ServerEntity : MonoBehaviour
                 packet = clientData.Channel.GetPacket();
             }
         }
+
+        foreach (var disconnectedClientId in disconnectsToRemove)
+        {
+            clients.Remove(disconnectedClientId);
+        }
+        disconnectsToRemove.Clear();
         
         if (sendSnapshotAccum >= sendRate) // Check if snapshot must be sent
         {
@@ -287,6 +295,9 @@ public class ServerEntity : MonoBehaviour
                 var shotsList = DeserializePlayerShot(buffer);
                 ProcessReceivedShots(shotsList, clientId);
                 break;
+            case PacketType.PlayerDisconnect:
+                ProcessPlayerDisconnect(clientId);
+                break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -441,6 +452,40 @@ public class ServerEntity : MonoBehaviour
     {
         var packet = Packet.Obtain();
         ServerSerializationManager.SerializePlayerRespawnBroadcast(packet.buffer, shotPlayerId, newPosition, nextSnapshotSeq);
+        packet.buffer.Flush();
+
+        clientData.Channel.Send(packet, clientData.ClientIpEndPoint);
+
+        packet.Free();
+    }
+    
+    private void ProcessPlayerDisconnect(int disconnectedClientId)
+    {
+        clients[disconnectedClientId].Channel.Disconnect();
+        Destroy(clients[disconnectedClientId].Controller.gameObject);
+        
+        foreach (var clientDataPair in clients)
+        {
+            var timeouts = clientDataPair.Value.PlayerJoinedTimeouts;
+            if (timeouts.ContainsKey(disconnectedClientId))
+            {
+                timeouts.Remove(disconnectedClientId);
+            }
+        }
+        disconnectsToRemove.Add(disconnectedClientId);
+        clientCount--;
+        
+        foreach (var clientPair in clients)
+        {
+            var clientData = clientPair.Value;
+            SendPlayerDisconnectBroadcast(clientData, disconnectedClientId);
+        }
+    }
+
+    private void SendPlayerDisconnectBroadcast(ClientData clientData, int disconnectedClientId)
+    {
+        var packet = Packet.Obtain();
+        ServerSerializationManager.SerializePlayerDisconnectBroadcast(packet.buffer, disconnectedClientId);
         packet.buffer.Flush();
 
         clientData.Channel.Send(packet, clientData.ClientIpEndPoint);

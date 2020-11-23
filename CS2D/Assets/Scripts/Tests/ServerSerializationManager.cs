@@ -124,4 +124,10 @@ public static class ServerSerializationManager
         buffer.PutFloat(newPosition.y);
         buffer.PutFloat(newPosition.z);
     }
+
+    public static void SerializePlayerDisconnectBroadcast(BitBuffer buffer, int disconnectedClientId)
+    {
+        buffer.PutByte((int) PacketType.PlayerDisconnectBroadcast);
+        buffer.PutInt(disconnectedClientId);
+    }
 }

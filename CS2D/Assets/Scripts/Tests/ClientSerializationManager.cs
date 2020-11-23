@@ -59,4 +59,13 @@ public class ClientSerializationManager
             buffer.PutInt(shot.ShotPlayerId);
         }
     }
+
+    /*
+     * -- FORMAT --
+     * Packet Type (byte)
+     */
+    public static void SerializePlayerDisconnect(BitBuffer buffer)
+    {
+        buffer.PutByte((int) PacketType.PlayerDisconnect);
+    }
 }

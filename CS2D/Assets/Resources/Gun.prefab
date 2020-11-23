@@ -2281,8 +2281,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   firstPersonView: {fileID: 0}
   mainCamera: {fileID: 0}
-  bulletSpawn: {fileID: 0}
-  bullet: {fileID: 128516, guid: 9b23a7cb44ba8af488216f863cd64f28, type: 3}
   roundsPerSecond: 10
   mouseSensitivity_notAiming: 4
   mouseSensitivity_aiming: 1
