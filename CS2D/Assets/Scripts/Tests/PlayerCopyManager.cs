@@ -16,7 +16,7 @@ public class PlayerCopyManager : MonoBehaviour
     private Vector3? respawnPosition;
     
     public Animator animator;
-    private const float Epsilon = 0.0001f;
+    private const float Epsilon = 0.001f;
 
     // Start is called before the first frame update
     void Start()
@@ -37,9 +37,9 @@ public class PlayerCopyManager : MonoBehaviour
         //Debug.Log($"{transf.position.x} {transf.position.y} {transf.position.z} {position.x} {position.y} {position.z}");
         var delta = transf.position - position;
         SetAnimatorMovementParameters(delta);
-        //characterController.Move(-delta);
+        characterController.Move(-delta);
         //Debug.Log($"{position.x} {position.y} {position.z}");
-        transf.position = position;
+        //transf.position = position;
         transf.rotation = rotation;
     }
 
@@ -47,15 +47,15 @@ public class PlayerCopyManager : MonoBehaviour
     {
         var deltaX = delta.x;
         var deltaZ = delta.z;
-        //Debug.Log(deltaX + " " + deltaZ);
+        Debug.Log(deltaX + " " + deltaZ);
 
-        //if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
-        //else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
-        //else animator.SetFloat("Horizontal Movement", 0);
+        if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
+        else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
+        else animator.SetFloat("Horizontal Movement", 0);
         
         if(deltaZ > Epsilon) animator.SetFloat("Vertical Movement", 1);
-        //else if(deltaZ < -Epsilon) animator.SetFloat("Vertical Movement", -1);
-        //else animator.SetFloat("Vertical Movement", 0);
+        else if(deltaZ < -Epsilon) animator.SetFloat("Vertical Movement", -1);
+        else animator.SetFloat("Vertical Movement", 0);
     }
 
     public void TriggerDeathAnimation()
@@ -107,5 +107,11 @@ public class PlayerCopyManager : MonoBehaviour
     private void PlayFootstep() // Called as animation event
     {
         
+    }
+
+    public void StopAnimatorMovement()
+    {
+        animator.SetFloat("Horizontal Movement", 0);
+        animator.SetFloat("Vertical Movement", 0);
     }
 }

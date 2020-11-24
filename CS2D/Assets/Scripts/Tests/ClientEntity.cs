@@ -172,16 +172,8 @@ public class ClientEntity : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Alpha1)) // TODO ADD REMAINING LATENCIES, LOWER MAX
-        {
-            latency = 0;
-        } else if (Input.GetKeyDown(KeyCode.Alpha5))
-        {
-            latency = 1000;
-        }
-        
         // Check for incoming packets
-        var packet = channel.GetPacket();//recvChannel.GetPacket();
+        var packet = channel.GetPacket();
         while (packet != null) {
             var buffer = packet.buffer;
             DeserializeBuffer(buffer);
@@ -197,9 +189,12 @@ public class ClientEntity : MonoBehaviour
         if (isPlaying)
         {
             clientTime += Time.deltaTime;
+            
             ReadInput();
             UpdateInterpolationBuffer();
+            
             if (!isPlaying) return;
+            
             Interpolate(interpolationBuffer[0], interpolationBuffer[1]);
         }
     }
@@ -208,13 +203,14 @@ public class ClientEntity : MonoBehaviour
     {
         // Remove header snapshot when time advances
         var nextTime = interpolationBuffer[1].Time;
-        if (clientTime >= nextTime) {
+        while (clientTime >= nextTime) {
             interpolationBuffer.RemoveAt(0);
             displaySeq++;
             if (interpolationBuffer.Count < 2)
                 isPlaying = false;
 
             CheckPlayersRespawn();
+            nextTime = interpolationBuffer[1].Time;
         }
     }
 
@@ -236,23 +232,38 @@ public class ClientEntity : MonoBehaviour
         
         if (Input.GetKeyDown(KeyCode.W))
             commandsToSend.Up = true;
-        else if (Input.GetKeyUp(KeyCode.W) || (commandsToSend.Up && !Input.GetKey(KeyCode.W))) // TODO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.W))
             commandsToSend.Up = false;
         
         if (Input.GetKeyDown(KeyCode.S))
             commandsToSend.Down = true;
-        else if (Input.GetKeyUp(KeyCode.S) || (commandsToSend.Down && !Input.GetKey(KeyCode.S))) // TODO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.S))
             commandsToSend.Down = false;
         
         if (Input.GetKeyDown(KeyCode.A))
             commandsToSend.Left = true;
-        else if (Input.GetKeyUp(KeyCode.A) || (commandsToSend.Left && !Input.GetKey(KeyCode.A))) // TODO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.A))
             commandsToSend.Left = false;
 
         if (Input.GetKeyDown(KeyCode.D))
             commandsToSend.Right = true;
-        else if (Input.GetKeyUp(KeyCode.D) || (commandsToSend.Right && !Input.GetKey(KeyCode.D))) // TODO DELETE SECOND CHECK
+        else if (Input.GetKeyUp(KeyCode.D))
             commandsToSend.Right = false;
+        
+        /* Latency addition keys */
+        if (Input.GetKeyDown(KeyCode.Alpha1)) {
+            latency = 100;
+        } else if (Input.GetKeyDown(KeyCode.Alpha2)) {
+            latency = 200;
+        } else if (Input.GetKeyDown(KeyCode.Alpha3)) {
+            latency = 300;
+        } else if (Input.GetKeyDown(KeyCode.Alpha4)) {
+            latency = 400;
+        } else if (Input.GetKeyDown(KeyCode.Alpha5)) {
+            latency = 500;
+        } else if (Input.GetKeyDown(KeyCode.Alpha0)) {
+            latency = 0;
+        }
     }
     
     private void Interpolate(Snapshot prevSnapshot, Snapshot nextSnapshot)
@@ -276,8 +287,7 @@ public class ClientEntity : MonoBehaviour
             rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
-            Debug.Log($"{prevSnapshot.Positions[playerId].x} {prevSnapshot.Positions[playerId].z} " +
-                      $"{nextSnapshot.Positions[playerId].x} {nextSnapshot.Positions[playerId].z} {t} {position.x} {position.z}");
+
             playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }
     }
