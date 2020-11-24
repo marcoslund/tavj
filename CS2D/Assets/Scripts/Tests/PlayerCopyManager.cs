@@ -17,29 +17,31 @@ public class PlayerCopyManager : MonoBehaviour
     
     public Animator animator;
     private const float Epsilon = 0.001f;
+    
+    [Header("Audio Clips")]
+    private AudioSource audioSource;
+    public AudioClip[] walkingClips;
+    private float walkingClipTimer;
+    private float walkingClipTimerLimit = 0.35f;
+
+    public AudioClip shotClip;
+    public AudioClip[] deathClips;
 
     // Start is called before the first frame update
     void Start()
     {
         characterController = GetComponent<CharacterController>();
-        //animator.SetBool("Shooting", true);
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        audioSource = GetComponent<AudioSource>();
     }
 
     public void MovePlayerCopy(Vector3 position, Quaternion rotation)
     {
         var transf = transform;
-        //Debug.Log($"{transf.position.x} {transf.position.y} {transf.position.z} {position.x} {position.y} {position.z}");
         var delta = transf.position - position;
+        
         SetAnimatorMovementParameters(delta);
+        
         characterController.Move(-delta);
-        //Debug.Log($"{position.x} {position.y} {position.z}");
-        //transf.position = position;
         transf.rotation = rotation;
     }
 
@@ -47,7 +49,6 @@ public class PlayerCopyManager : MonoBehaviour
     {
         var deltaX = delta.x;
         var deltaZ = delta.z;
-        Debug.Log(deltaX + " " + deltaZ);
 
         if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
         else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
@@ -106,7 +107,22 @@ public class PlayerCopyManager : MonoBehaviour
     
     private void PlayFootstep() // Called as animation event
     {
-        
+        PlayRandomClip(walkingClips);
+    }
+    
+    public void PlayShot()
+    {
+        audioSource.PlayOneShot(shotClip);
+    }
+    
+    public void PlayDeath()
+    {
+        PlayRandomClip(deathClips);
+    }
+    
+    private void PlayRandomClip(AudioClip[] audioClips)
+    {
+        audioSource.PlayOneShot(audioClips[Random.Range(0, audioClips.Length)]);
     }
 
     public void StopAnimatorMovement()

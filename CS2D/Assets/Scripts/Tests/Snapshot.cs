@@ -32,6 +32,12 @@ public class Snapshot : IComparable<Snapshot>
 
     public override string ToString()
     {
-        return $"Seq: {seq}, Time: {time}, Positions: {positions}, Rotations: {rotations}";
+        var result = $"Seq: {seq}, Time: {time}, ";
+        foreach (var pos in positions)
+        {
+            result += $"Player {pos.Key}: Position ({pos.Value.x}, {pos.Value.y}, {pos.Value.z}) Rotation: {rotations[pos.Key]}, ";
+        }
+
+        return result;
     }
 }

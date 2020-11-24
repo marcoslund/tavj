@@ -63,12 +63,14 @@ public class ClientEntity : MonoBehaviour
     public UIEventManager uiEventManagerventManager;
     private bool disconnectFromPauseMenu;
 
+    [Header("Audio Clips")]
     private AudioSource audioSource;
     public AudioClip[] walkingClips;
     private float walkingClipTimer;
     private float walkingClipTimerLimit = 0.35f;
 
     public AudioClip shotClip;
+    public AudioClip[] deathClips;
 
     private int latency;
 
@@ -208,7 +210,7 @@ public class ClientEntity : MonoBehaviour
             displaySeq++;
             if (interpolationBuffer.Count < 2)
                 isPlaying = false;
-
+            
             CheckPlayersRespawn();
             nextTime = interpolationBuffer[1].Time;
         }
@@ -287,6 +289,14 @@ public class ClientEntity : MonoBehaviour
             rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
+            /*if (position == playerCopyPair.Value.transform.position)
+            {
+                Debug.Log($"CTIME {clientTime} PREVSNAPT {prevSnapshot.Time} NEXTSNAPT {nextSnapshot.Time} " +
+                          $"{playerCopyPair.Value.transform.position.x} {playerCopyPair.Value.transform.position.z}");
+                Debug.Log($"{prevSnapshot.Seq} {prevSnapshot.Positions[playerId].x} {prevSnapshot.Seq} {prevSnapshot.Positions[playerId].z} " +
+                          $"{nextSnapshot.Positions[playerId].x} {nextSnapshot.Positions[playerId].z} T {t} RES {position.x} {position.z}");
+                //Debug.Log(prevSnapshot + " " + nextSnapshot);
+            }*/
 
             playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }
@@ -580,6 +590,9 @@ public class ClientEntity : MonoBehaviour
         var shooterId = buffer.GetInt();
         var shotPlayerId = buffer.GetInt();
         var shotPlayerHealth = buffer.GetInt();
+
+        var shooterExists = otherPlayers.ContainsKey(shooterId);
+        var victimExists = otherPlayers.ContainsKey(shotPlayerId);
         
         if (shotPlayerId == clientId)
         {
@@ -589,28 +602,35 @@ public class ClientEntity : MonoBehaviour
             {
                 uiEventManagerventManager.ShowKillEvent(
                     shooterId,
-                    otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER", 
+                    shooterExists ? otherPlayers[shooterId].PlayerName : "PLAYER", 
                     shotPlayerId,
                     clientName);
                 ShowOwnDeathAnimation();
             }
+            if (shooterExists)
+            {
+                otherPlayers[shooterId].PlayShot();
+            }
         } else if (shotPlayerHealth <= 0)
         {
-            if (!otherPlayers.ContainsKey(shotPlayerId)) return;
+            if (!victimExists) return;
             
             var shotPlayer = otherPlayers[shotPlayerId];
             shotPlayer.IsDead = true;
             uiEventManagerventManager.ShowKillEvent(shooterId, shooterId == clientId? clientName : 
-                (otherPlayers.ContainsKey(shooterId) ? otherPlayers[shooterId].PlayerName : "PLAYER"), shotPlayerId, shotPlayer.PlayerName);
+                (shooterExists ? otherPlayers[shooterId].PlayerName : "PLAYER"), shotPlayerId, shotPlayer.PlayerName);
             shotPlayer.TriggerDeathAnimation();
+            if (shooterExists)
+            {
+                otherPlayers[shooterId].PlayShot();
+            }
+            otherPlayers[shotPlayerId].PlayDeath();
         }
 
-        if (shooterId != clientId && otherPlayers.ContainsKey(shooterId))
+        if (shooterId != clientId && shooterExists)
         {
             otherPlayers[shooterId].ShowMuzzelFlash();
         }
-        
-        // TODO SEND ACK...
     }
 
     private void ShowOwnDeathAnimation()
@@ -626,6 +646,7 @@ public class ClientEntity : MonoBehaviour
         cameraMain.rotation = Quaternion.Euler(new Vector3(deathCameraRotationX, originalCameraRot.y, originalCameraRot.z));
         
         thirdPersonAnimator.SetTrigger("Dying");
+        PlayDeath();
     }
 
     private void DeserializePlayerRespawn(BitBuffer buffer)
@@ -752,6 +773,11 @@ public class ClientEntity : MonoBehaviour
     public void PlayShot()
     {
         audioSource.PlayOneShot(shotClip);
+    }
+
+    private void PlayDeath()
+    {
+        PlayRandomClip(deathClips);
     }
 
     public int ClientId => clientId;
