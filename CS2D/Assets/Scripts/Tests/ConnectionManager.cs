@@ -10,7 +10,7 @@ public class ConnectionManager : MonoBehaviour
 {
     // Channels to and from server
     private const int ServerPort = 9000;
-    private const int ManagerPort = 9001; // TODO HARDCODED, CONFLICT WITH OTHER INSTANCES
+    private const int ManagerPort = 9001;
     private Channel channel;
     private string serverIp;
     private IPEndPoint serverIpEndPoint;
@@ -20,8 +20,6 @@ public class ConnectionManager : MonoBehaviour
     
     private float connectionTimeoutTimer;
     private const float ClientConnectionTimeout = 1f;
-    
-    //public GameObject cubePrefab;
 
     // Update is called once per frame
     void Update()

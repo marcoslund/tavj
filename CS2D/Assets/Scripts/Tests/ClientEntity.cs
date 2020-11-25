@@ -289,14 +289,6 @@ public class ClientEntity : MonoBehaviour
             rotation.x = InterpolateAxis(prevSnapshot.Rotations[playerId].x, nextSnapshot.Rotations[playerId].x, t);
             rotation.y = InterpolateAxis(prevSnapshot.Rotations[playerId].y, nextSnapshot.Rotations[playerId].y, t);
             rotation.z = InterpolateAxis(prevSnapshot.Rotations[playerId].z, nextSnapshot.Rotations[playerId].z, t);
-            /*if (position == playerCopyPair.Value.transform.position)
-            {
-                Debug.Log($"CTIME {clientTime} PREVSNAPT {prevSnapshot.Time} NEXTSNAPT {nextSnapshot.Time} " +
-                          $"{playerCopyPair.Value.transform.position.x} {playerCopyPair.Value.transform.position.z}");
-                Debug.Log($"{prevSnapshot.Seq} {prevSnapshot.Positions[playerId].x} {prevSnapshot.Seq} {prevSnapshot.Positions[playerId].z} " +
-                          $"{nextSnapshot.Positions[playerId].x} {nextSnapshot.Positions[playerId].z} T {t} RES {position.x} {position.z}");
-                //Debug.Log(prevSnapshot + " " + nextSnapshot);
-            }*/
 
             playerCopyPair.Value.MovePlayerCopy(position, rotation);
         }

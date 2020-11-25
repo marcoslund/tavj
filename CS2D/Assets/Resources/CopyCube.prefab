@@ -141,13 +141,13 @@ CharacterController:
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Height: 2
-  m_Radius: 0.5
+  m_Height: 2.3
+  m_Radius: 0.4
   m_SlopeLimit: 45
   m_StepOffset: 0.3
   m_SkinWidth: 0.0001
   m_MinMoveDistance: 0.001
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: 0.151, z: 0}
 --- !u!82 &-8016712748065669576
 AudioSource:
   m_ObjectHideFlags: 0
@@ -371,6 +371,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &2235678437968953490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6719652504705734572}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fdd65a53f16c604dadcf953b3ca6133, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerCopyManager: {fileID: 2751432109598884126}
 --- !u!1001 &9209530109498647070
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -17,6 +17,9 @@ public class PlayerCopyManager : MonoBehaviour
     
     public Animator animator;
     private const float Epsilon = 0.001f;
+    private bool prevFrameMoved;
+    private int prevFrameVertMovement;
+    private int prevFrameHorizMovement;
     
     [Header("Audio Clips")]
     private AudioSource audioSource;
@@ -49,14 +52,58 @@ public class PlayerCopyManager : MonoBehaviour
     {
         var deltaX = delta.x;
         var deltaZ = delta.z;
-
-        if(deltaX > Epsilon) animator.SetFloat("Horizontal Movement", 1);
-        else if(deltaX < -Epsilon) animator.SetFloat("Horizontal Movement", -1);
-        else animator.SetFloat("Horizontal Movement", 0);
         
-        if(deltaZ > Epsilon) animator.SetFloat("Vertical Movement", 1);
-        else if(deltaZ < -Epsilon) animator.SetFloat("Vertical Movement", -1);
-        else animator.SetFloat("Vertical Movement", 0);
+        if (deltaX == 0 && deltaZ == 0)
+        {
+            if (prevFrameMoved)
+            {
+                animator.SetFloat("Horizontal Movement", prevFrameHorizMovement);
+                animator.SetFloat("Vertical Movement", prevFrameVertMovement);
+            }
+            else
+            {
+                animator.SetFloat("Horizontal Movement", 0);
+                animator.SetFloat("Vertical Movement", 0);
+            }
+            prevFrameMoved = false;
+            return;
+        }
+
+        if (deltaX > Epsilon)
+        {
+            animator.SetFloat("Horizontal Movement", 1);
+            prevFrameHorizMovement = 1;
+            prevFrameMoved = true;
+        }
+        else if (deltaX < -Epsilon)
+        {
+            animator.SetFloat("Horizontal Movement", -1);
+            prevFrameHorizMovement = -1;
+            prevFrameMoved = true;
+        }
+        else
+        {
+            animator.SetFloat("Horizontal Movement", 0);
+            prevFrameHorizMovement = 0;
+        }
+
+        if (deltaZ > Epsilon)
+        {
+            animator.SetFloat("Vertical Movement", 1);
+            prevFrameVertMovement = 1;
+            prevFrameMoved = true;
+        }
+        else if (deltaZ < -Epsilon)
+        {
+            animator.SetFloat("Vertical Movement", -1);
+            prevFrameVertMovement = -1;
+            prevFrameMoved = true;
+        }
+        else
+        {
+            animator.SetFloat("Vertical Movement", 0);
+            prevFrameVertMovement = 0;
+        }
     }
 
     public void TriggerDeathAnimation()
@@ -105,7 +152,7 @@ public class PlayerCopyManager : MonoBehaviour
         set => respawnPosition = value;
     }
     
-    private void PlayFootstep() // Called as animation event
+    public void PlayFootstep()
     {
         PlayRandomClip(walkingClips);
     }
