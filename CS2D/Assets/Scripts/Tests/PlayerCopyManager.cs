@@ -16,7 +16,7 @@ public class PlayerCopyManager : MonoBehaviour
     private Vector3? respawnPosition;
     
     public Animator animator;
-    private const float Epsilon = 0.001f;
+    private const float Epsilon = 0.00001f;
     private bool prevFrameMoved;
     private int prevFrameVertMovement;
     private int prevFrameHorizMovement;
@@ -24,8 +24,6 @@ public class PlayerCopyManager : MonoBehaviour
     [Header("Audio Clips")]
     private AudioSource audioSource;
     public AudioClip[] walkingClips;
-    private float walkingClipTimer;
-    private float walkingClipTimerLimit = 0.35f;
 
     public AudioClip shotClip;
     public AudioClip[] deathClips;
@@ -170,11 +168,5 @@ public class PlayerCopyManager : MonoBehaviour
     private void PlayRandomClip(AudioClip[] audioClips)
     {
         audioSource.PlayOneShot(audioClips[Random.Range(0, audioClips.Length)]);
-    }
-
-    public void StopAnimatorMovement()
-    {
-        animator.SetFloat("Horizontal Movement", 0);
-        animator.SetFloat("Vertical Movement", 0);
     }
 }

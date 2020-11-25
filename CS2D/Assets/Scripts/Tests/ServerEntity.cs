@@ -68,17 +68,10 @@ public class ServerEntity : MonoBehaviour
             var clientId = client.Key;
             var clientData = client.Value;
             var transf = clientData.Controller.transform;
-            var toUpdatePos = transf.position;
-            var moved = MovePlayer(clientId, clientData.Controller, clientData.YVelocity, clientData.RecvCommands);
-            if (moved)
-            {
-                var updatedPos = transf.position;
-                clientData.PlayerCopyManager.SetAnimatorMovementParameters(toUpdatePos - updatedPos);
-            }
-            else
-            {
-                clientData.PlayerCopyManager.StopAnimatorMovement();
-            }
+            var toUpdatePos = new Vector3(transf.position.x, transf.position.y, transf.position.z);
+            MovePlayer(clientId, clientData.Controller, clientData.YVelocity, clientData.RecvCommands);
+            var updatedPos = transf.position;
+            clientData.PlayerCopyManager.SetAnimatorMovementParameters(toUpdatePos - updatedPos);
         }
     }
 
@@ -141,11 +134,10 @@ public class ServerEntity : MonoBehaviour
         }
     }
 
-    private bool MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> receivedCommands)
+    private void MovePlayer(int clientId, CharacterController controller, float velocity, List<Commands> receivedCommands)
     {
         var ctrlTransform = controller.transform;
 
-        var hasMoveCommand = false;
         foreach (var commands in receivedCommands)
         {
             Vector3 move = Vector3.zero;
@@ -175,15 +167,10 @@ public class ServerEntity : MonoBehaviour
             }*/
             
             controller.Move(move);
-
-            if (commands.isMoveCommand())
-                hasMoveCommand = true;
         }
         
         receivedCommands.Clear();
         clients[clientId].YVelocity = velocity;
-
-        return hasMoveCommand;
     }
 
     private void SendSnapshotToClient(int clientId, ClientData clientData)
