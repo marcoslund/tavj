@@ -1,4 +1,5 @@
-# TAVJ
+# 72.86 - Técnicas Avanzadas en Videojuegos
+ITBA 2020
 
 ## WARZONE
 
