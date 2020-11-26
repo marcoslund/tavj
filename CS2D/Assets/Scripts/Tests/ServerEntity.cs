@@ -140,6 +140,10 @@ public class ServerEntity : MonoBehaviour
 
         foreach (var commands in receivedCommands)
         {
+            if (commands.Seq < 10)
+            {
+                Debug.Log($"SEQ {commands.Seq} {commands} TIME {serverTime} PREVPOS {ctrlTransform.position.x} {ctrlTransform.position.y} {ctrlTransform.position.z}");
+            }
             Vector3 move = Vector3.zero;
             /*bool canJump = false;*/
             move.x = commands.GetHorizontal() * Time.fixedDeltaTime * PlayerSpeed;
@@ -147,7 +151,7 @@ public class ServerEntity : MonoBehaviour
             ctrlTransform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
             move = ctrlTransform.TransformDirection(move);
             
-            if (!controller.isGrounded)
+            /*if (!controller.isGrounded)
             {
                 velocity += GravityValue * Time.fixedDeltaTime;
                 move.y = velocity * Time.fixedDeltaTime;
@@ -157,7 +161,7 @@ public class ServerEntity : MonoBehaviour
                 velocity = GravityValue * Time.fixedDeltaTime;
                 move.y = GravityValue * Time.fixedDeltaTime;
                 //canJump = true;
-            }
+            }*/
             
             /*if (commands.Space && controller.isGrounded && canJump)
             {
@@ -167,6 +171,10 @@ public class ServerEntity : MonoBehaviour
             }*/
             
             controller.Move(move);
+            if (commands.Seq < 10)
+            {
+                Debug.Log($"AFTERPOS {ctrlTransform.position.x} {ctrlTransform.position.y} {ctrlTransform.position.z}");
+            }
         }
         
         receivedCommands.Clear();

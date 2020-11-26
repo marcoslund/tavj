@@ -73,6 +73,8 @@ public class ClientEntity : MonoBehaviour
     public AudioClip[] deathClips;
 
     private int latency;
+    
+    Vector3 conciliationPosition;
 
     private void Awake()
     {
@@ -125,6 +127,8 @@ public class ClientEntity : MonoBehaviour
         firstPersonView = GetComponent<FirstPersonView>();
 
         audioSource = GetComponent<AudioSource>();
+
+        conciliationPosition = transform.position;
     }
 
     private void InitializeConnectedPlayers()
@@ -157,6 +161,10 @@ public class ClientEntity : MonoBehaviour
 
     private void FixedUpdate()
     {
+        characterController.enabled = false;
+        transform.position = conciliationPosition;
+        characterController.enabled = true;
+        Physics.SyncTransforms();
         commandsToSend.RotationY = transform.rotation.eulerAngles.y;
         var move = MovePlayer(commandsToSend);
         if (handsAnimator)
@@ -170,6 +178,8 @@ public class ClientEntity : MonoBehaviour
         predictionCommands.Add(new Commands(commandsToSend));
         SendCommands(unAckedCommands);
         commandsToSend.Seq++;
+        
+        conciliationPosition = new Vector3(transform.position.x, transform.position.y, transform.position.z);
     }
 
     private void Update()
@@ -367,7 +377,7 @@ public class ClientEntity : MonoBehaviour
             rotations.Add(playerId, rotation);
 
             if (playerId == clientId)
-                Conciliate(recvCmdSeq, position, recvVelY);
+                Conciliate(recvCmdSeq, position, recvVelY, recvFrameSeq, time);
         }
         
         var snapshot = new Snapshot(recvFrameSeq, time, positions, rotations);
@@ -385,8 +395,9 @@ public class ClientEntity : MonoBehaviour
         interpolationBuffer.Insert(bufferIndex, snapshot);
     }
 
-    private void Conciliate(int recvCmdSeq, Vector3 position, float recvVelY)
+    private void Conciliate(int recvCmdSeq, Vector3 position, float recvVelY, int recvFrameSeq, float snaptime)
     {
+        var lalala = new Vector3(transform.position.x, transform.position.y, transform.position.z);
         // Delete saved command sequences based on received sequence number
         int toRemoveCmdIndex = 0;
         foreach (var commands in predictionCommands)
@@ -398,29 +409,52 @@ public class ClientEntity : MonoBehaviour
                 
         // Conciliate local state with received snapshot data
         var currentRotationY = transform.rotation.eulerAngles.y;
+        characterController.enabled = false;
         transform.position = position;
+        characterController.enabled = true;
         foreach (var commands in predictionCommands)
         {
+            if (commands.Seq < 9)
+            {
+                Debug.Log($"RECV SNAPSHOT {recvFrameSeq} WITH FRAME SEQ {recvCmdSeq} AND TIME {snaptime}");
+                foreach (var cmd in predictionCommands)
+                {
+                    Debug.Log(cmd.Seq);
+                }
+                Debug.Log($"CONCIL SEQ {commands.Seq} {commands} TIME {clientTime} PREVPOS {transform.position.x} {transform.position.y} {transform.position.z}");
+            }
             Vector3 move = Vector3.zero;
             move.x += commands.GetHorizontal() * Time.fixedDeltaTime * speed;
             move.z += commands.GetVertical() * Time.fixedDeltaTime * speed;
             transform.rotation = Quaternion.Euler(0, commands.RotationY, 0);
             move = transform.TransformDirection(move);
             
-            if (!characterController.isGrounded)
+            /*if (!characterController.isGrounded)
             {
                 recvVelY += gravity * Time.fixedDeltaTime;
                 move.y = velocityY * Time.fixedDeltaTime;
-            }
+            }*/
             
             characterController.Move(move);
+            conciliationPosition = new Vector3(transform.position.x, transform.position.y, transform.position.z);
+            Physics.SyncTransforms();
+            if (commands.Seq < 9)
+            {
+                Debug.Log($"NEXTPOS {transform.position.x} {transform.position.y} {transform.position.z}");
+            }
         }
         velocityY = recvVelY;
         transform.rotation = Quaternion.Euler(0, currentRotationY, 0);
+        var papapa = new Vector3(transform.position.x, transform.position.y, transform.position.z);
+        Debug.Log(lalala - papapa);
     }
 
     private Vector3 MovePlayer(Commands commands)
     {
+        if (commands.Seq < 10)
+        {
+            Debug.Log($"SEQ {commands.Seq} {commands} PREVPOS {transform.position.x} {transform.position.y} {transform.position.z}");
+        }
         Vector3 move = Vector3.zero;
         /*bool canJump = false;*/
         
@@ -428,7 +462,7 @@ public class ClientEntity : MonoBehaviour
         move.z = commands.GetVertical() * Time.fixedDeltaTime * speed;
         move = transform.TransformDirection(move);
         
-        if (!characterController.isGrounded)
+        /*if (!characterController.isGrounded)
         {
             velocityY += gravity * Time.fixedDeltaTime;
             move.y = velocityY * Time.fixedDeltaTime;
@@ -438,7 +472,7 @@ public class ClientEntity : MonoBehaviour
             velocityY = gravity * Time.fixedDeltaTime;
             move.y = gravity * Time.fixedDeltaTime;
             //canJump = true;
-        }
+        }*/
         
         /*if (commands.Space && _characterController.isGrounded && canJump)
         {
@@ -448,7 +482,10 @@ public class ClientEntity : MonoBehaviour
         }*/
         
         characterController.Move(move);
-
+        if (commands.Seq < 10)
+        {
+            Debug.Log($"NEXTPOS {transform.position.x} {transform.position.y} {transform.position.z}");
+        }
         return move;
     }
     
@@ -678,7 +715,9 @@ public class ClientEntity : MonoBehaviour
         firstPersonView.enabled = true;
         playerHealthManager.TogglePlayerHealth();
         playerHealthManager.SetPlayerHealth(startingHealth);
+        characterController.enabled = false;
         transform.position = newPosition;
+        characterController.enabled = true;
 
         cameraMain.position = transform.TransformPoint(new Vector3(0,1,0));
         cameraMain.rotation = Quaternion.Euler(Vector3.zero);

@@ -11,7 +11,10 @@ public static class ServerSerializationManager
         buffer.PutByte((int) PacketType.Snapshot);
         buffer.PutInt(snapshotSeq);
         buffer.PutFloat(serverTime);
-        buffer.PutInt(clientData.RecvCommandSeq);
+        if(clientData.RecvCommands.Count == 0)
+            buffer.PutInt(clientData.RecvCommandSeq);
+        else
+            buffer.PutInt(clientData.RecvCommands[0].Seq - 1);
         buffer.PutFloat(clientData.YVelocity);
         buffer.PutByte(clients.Count);
 
