@@ -157,7 +157,10 @@ public class PlayerCopyManager : MonoBehaviour
     
     public void PlayShot()
     {
+        var volume = audioSource.volume;
+        audioSource.volume *= 0.5f;
         audioSource.PlayOneShot(shotClip);
+        audioSource.volume = volume;
     }
     
     public void PlayDeath()
